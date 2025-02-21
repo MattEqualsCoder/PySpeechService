@@ -2,19 +2,19 @@
 
 namespace PySpeechServiceClient.Grammar;
 
-public class GrammarBuilder
+public class SpeechRecognitionGrammarBuilder
 {
     public readonly GrammarElement GrammarElement = new(GrammarElementType.Rule);
 
     private readonly List<GrammarElement> _grammarElements = [];
     
-    public GrammarBuilder(string? rule = null)
+    public SpeechRecognitionGrammarBuilder(string? rule = null)
     {
-        GrammarElement.Key = rule;
+        GrammarElement.Key = string.IsNullOrEmpty(rule) ? Guid.NewGuid().ToString() : rule;
         GrammarElement.Data = _grammarElements;
     }
 
-    public GrammarBuilder(IEnumerable<GrammarBuilder> choices, string? rule = null)
+    public SpeechRecognitionGrammarBuilder(IEnumerable<SpeechRecognitionGrammarBuilder> choices, string? rule = null)
     {
         GrammarElement.Key = rule;
         GrammarElement.Data = _grammarElements;
@@ -22,48 +22,47 @@ public class GrammarBuilder
             .Select(builder => new GrammarElement(GrammarElementType.Rule, builder._grammarElements)).ToList()));
     }
     
-    public static GrammarBuilder Combine(params GrammarBuilder[] choices)
+    public static SpeechRecognitionGrammarBuilder Combine(params SpeechRecognitionGrammarBuilder[] choices)
     {
-        return new GrammarBuilder(choices);
+        return new SpeechRecognitionGrammarBuilder(choices);
     }
     
-    public GrammarBuilder Append(string text)
+    public SpeechRecognitionGrammarBuilder Append(string text)
     {
         _grammarElements.Add(new GrammarElement(GrammarElementType.String, text));
         return this;
     }
     
-    public GrammarBuilder Append(string key, List<GrammarKeyValueChoice> grammarChoices)
+    public SpeechRecognitionGrammarBuilder Append(string key, List<GrammarKeyValueChoice> grammarChoices)
     {
         _grammarElements.Add(new GrammarElement(GrammarElementType.KeyValue, grammarChoices));
         return this;
     }
     
-    public GrammarBuilder OneOf(params string[] choices)
+    public SpeechRecognitionGrammarBuilder OneOf(params string[] choices)
     {
         _grammarElements.Add(new GrammarElement(GrammarElementType.OneOf, choices));
         return this;
     }
     
-    public GrammarBuilder Optional(string text)
+    public SpeechRecognitionGrammarBuilder Optional(string text)
     {
         return Optional([text]);
     }
     
-    public GrammarBuilder Optional(params string[] choices)
+    public SpeechRecognitionGrammarBuilder Optional(params string[] choices)
     {
         _grammarElements.Add(new GrammarElement(GrammarElementType.Optional, choices));
         return this;
     }
 
-    [SupportedOSPlatform("windows")]
-    public System.Speech.Recognition.Grammar Build()
+    public SpeechRecognitionGrammar BuildGrammar(string? ruleName = null)
     {
-        System.Speech.Recognition.GrammarBuilder builder = new(GrammarElement.Key);
-        GrammarElement.AddToNativeGrammar(builder);
-        return new System.Speech.Recognition.Grammar(builder)
+        if (!string.IsNullOrEmpty(ruleName))
         {
-            Name = GrammarElement.Key
-        };
+            GrammarElement.Key = ruleName;
+        }
+        
+        return new SpeechRecognitionGrammar(GrammarElement);
     }
 }

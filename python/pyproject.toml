@@ -1,0 +1,31 @@
+[tool.poetry]
+name = "py-speech-service"
+version = "0.0.5"
+description = ""
+authors = ["MattEqualsCoder <mattequalscoder@gmail.com>"]
+readme = "README.md"
+
+[tool.poetry.dependencies]
+python = "~3.12"
+num2words = "^0.5.14"
+rapidfuzz = "^3.11.0"
+speechrecognition = "^3.14.1"
+vosk = "^0.3.45"
+pydub = "^0.25.1"
+pyaudio = "^0.2.14"
+pyinstaller = "^6.11.1"
+sounddevice = "^0.5.1"
+grpcio = "^1.70.0"
+grpcio-tools = "^1.70.0"
+asyncio = "^3.4.3"
+yapper-tts = "^0.2.4"
+yapper = "^0.5.0"
+numpy = "^2.2.2"
+platformdirs = "^4.3.6"
+
+[build-system]
+requires = ["poetry-core"]
+build-backend = "poetry.core.masonry.api"
+
+[tool.poetry.scripts]
+py-speech-service = 'py_speech_service.__main__:cli'

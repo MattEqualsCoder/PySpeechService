@@ -8,9 +8,20 @@ public class GrammarElement(GrammarElementType type, object? data = null, string
     public GrammarElementType Type { get; set; } = type;
     public string? Key { get; set; } = key;
     public object Data { get; set; } = data ?? string.Empty;
-
+    
     [SupportedOSPlatform("windows")]
-    public void AddToNativeGrammar(System.Speech.Recognition.GrammarBuilder grammarBuilder)
+    public System.Speech.Recognition.Grammar ToSystemSpeechGrammar()
+    {
+        GrammarBuilder builder = new(Key);
+        AddToNativeGrammar(builder);
+        return new System.Speech.Recognition.Grammar(builder)
+        {
+            Name = Key
+        };
+    }
+    
+    [SupportedOSPlatform("windows")]
+    public void AddToNativeGrammar(GrammarBuilder grammarBuilder)
     {
         if (Type == GrammarElementType.Rule)
         {
