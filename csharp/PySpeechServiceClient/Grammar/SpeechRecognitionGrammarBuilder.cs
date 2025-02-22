@@ -35,7 +35,8 @@ public class SpeechRecognitionGrammarBuilder
     
     public SpeechRecognitionGrammarBuilder Append(string key, List<GrammarKeyValueChoice> grammarChoices)
     {
-        _grammarElements.Add(new GrammarElement(GrammarElementType.KeyValue, grammarChoices));
+        
+        _grammarElements.Add(new GrammarElement(GrammarElementType.KeyValue, grammarChoices, key));
         return this;
     }
     

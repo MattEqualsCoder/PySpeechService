@@ -1,11 +1,14 @@
 ﻿// See https://aka.ms/new-console-template for more information
 
+using System.Speech.Recognition;
 using Microsoft.Extensions.DependencyInjection;
 using Microsoft.Extensions.Logging;
+using Newtonsoft.Json;
 using PySpeechServiceClient;
 using PySpeechServiceClient.Grammar;
 using PySpeechServiceClient.Models;
 using Serilog;
+using JsonSerializer = System.Text.Json.JsonSerializer;
 
 Log.Logger = new LoggerConfiguration()
     .WriteTo.Console()
@@ -20,9 +23,6 @@ var serviceProvider = new ServiceCollection()
     .AddPySpeechService()
     .BuildServiceProvider();
 
-var client = serviceProvider.GetRequiredService<IPySpeechService>();
-await client.StartAsync();
-
 List<SpeechRecognitionGrammar> rules = [];
 
 var builder = new SpeechRecognitionGrammarBuilder("test rule 1");
@@ -33,7 +33,7 @@ rule.SpeechRecognized += (sender, eventArgs) =>
 {
     Console.WriteLine($"Test rule 1 recognized: {eventArgs.Result.Text} ({eventArgs.Result.Confidence})");
 };
-client.AddSpeechRecognitionCommand(rule);
+rules.Add(rule);
 
 builder = new SpeechRecognitionGrammarBuilder("test rule 2");
 builder.Append("Hey Tracker, ")
@@ -43,7 +43,50 @@ rule.SpeechRecognized += (sender, eventArgs) =>
 {
     Console.WriteLine($"Test rule 2 recognized: {eventArgs.Result.Text} ({eventArgs.Result.Confidence})");
 };
-client.AddSpeechRecognitionCommand(rule);
+rules.Add(rule);
+
+builder = new SpeechRecognitionGrammarBuilder("test rule 3");
+builder.Append("Hey Tracker, please give me")
+    .Append("food", [
+        new GrammarKeyValueChoice("Soup", "soup"),
+        new GrammarKeyValueChoice("Pizza", "pizza"),
+        new GrammarKeyValueChoice("Bread", "bread"),
+    ]);
+rule = builder.BuildGrammar();
+rule.SpeechRecognized += (sender, eventArgs) =>
+{
+    Console.WriteLine($"Test rule 3 recognized: {eventArgs.Result.Text} ({eventArgs.Result.Confidence}) - food: {eventArgs.Result.Semantics["food"].Value}");
+};
+rules.Add(rule);
+
+if (OperatingSystem.IsWindows())
+{
+    SpeechRecognitionEngine recognizer = new();
+    recognizer.SetInputToDefaultAudioDevice();
+        
+    foreach (var ruleToAdd in rules)
+    {
+        var systemSpeech = ruleToAdd.BuildSystemSpeechGrammar();
+        recognizer.LoadGrammar(systemSpeech);
+    }
+
+    recognizer.SpeechRecognized += (sender, eventArgs) =>
+    {
+        Console.WriteLine("Recognizier speech recognized " + JsonSerializer.Serialize(eventArgs.Result));
+    };
+
+    recognizer.RecognizeAsync(RecognizeMode.Multiple);
+
+    Console.ReadLine();
+    return;
+}
+
+var client = serviceProvider.GetRequiredService<IPySpeechService>();
+await client.StartAsync();
+foreach (var ruleToAdd in rules)
+{
+    client.AddSpeechRecognitionCommand(ruleToAdd);
+}
 
 while (client.IsConnected)
 {

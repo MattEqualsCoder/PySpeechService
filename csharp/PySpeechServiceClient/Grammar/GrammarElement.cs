@@ -1,5 +1,6 @@
 ﻿using System.Runtime.Versioning;
 using System.Speech.Recognition;
+using System.Text.Json;
 
 namespace PySpeechServiceClient.Grammar;
 
@@ -12,7 +13,7 @@ public class GrammarElement(GrammarElementType type, object? data = null, string
     [SupportedOSPlatform("windows")]
     public System.Speech.Recognition.Grammar ToSystemSpeechGrammar()
     {
-        GrammarBuilder builder = new(Key);
+        GrammarBuilder builder = new();
         AddToNativeGrammar(builder);
         return new System.Speech.Recognition.Grammar(builder)
         {
@@ -71,6 +72,7 @@ public class GrammarElement(GrammarElementType type, object? data = null, string
             {
                 grammarBuilderChoices.Add(new SemanticResultValue(choice.Key, choice.Value));
             }
+
             grammarBuilder.Append(new SemanticResultKey(Key, grammarBuilderChoices));
         }
         else if (Type == GrammarElementType.GrammarElementList)
@@ -80,10 +82,10 @@ public class GrammarElement(GrammarElementType type, object? data = null, string
                 throw new InvalidOperationException("Data must be a list of GrammarElements.");
             }
 
-            List<System.Speech.Recognition.GrammarBuilder> subElementBuilders = [];
+            List<GrammarBuilder> subElementBuilders = [];
             foreach (var element in elements)
             {
-                System.Speech.Recognition.GrammarBuilder subElementBuilder = new();
+                GrammarBuilder subElementBuilder = new();
                 element.AddToNativeGrammar(subElementBuilder);
                 subElementBuilders.Add(subElementBuilder);
             }

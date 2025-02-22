@@ -5,8 +5,14 @@
         <ImplicitUsings>enable</ImplicitUsings>
         <Nullable>enable</Nullable>
         <GeneratePackageOnBuild>true</GeneratePackageOnBuild>
-        <Version>0.0.3</Version>
+        <Version>0.0.8</Version>
     </PropertyGroup>
+
+    <PropertyGroup>
+      <GenerateAssemblyInfo>false</GenerateAssemblyInfo>
+      <GenerateTargetFrameworkAttribute>false</GenerateTargetFrameworkAttribute>    
+   </PropertyGroup>
+
 
     <ItemGroup>
       <PackageReference Include="Google.Protobuf" Version="3.29.3" />
