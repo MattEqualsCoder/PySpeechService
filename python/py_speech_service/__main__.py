@@ -1,7 +1,5 @@
-import argparse
-import logging
-
 import asyncio
+import logging
 import os
 import sys
 import time
@@ -26,12 +24,12 @@ def cli():
         Path(os.path.dirname(log_path)).mkdir(parents=True, exist_ok=True)
 
         logging.basicConfig(
-            handlers=[RotatingFileHandler(log_path, maxBytes=100000, backupCount=10)],
-            level=logging.DEBUG,
+            handlers=[RotatingFileHandler(log_path, maxBytes=500000, backupCount=3)],
+            level=logging.DEBUG if get_arg_flag("-d") else logging.INFO,
             format="[%(asctime)s] %(levelname)s [%(name)s.%(funcName)s:%(lineno)d] %(message)s",
             datefmt='%Y-%m-%d %H:%M:%S')
 
-        logging.info("py-speech-service v" + Version.name())
+        logging.info("Starting py-speech-service v" + Version.name())
 
         arg_array = sys.argv
 
@@ -63,7 +61,6 @@ def cli():
             speech_recognition = SpeechRecognition()
             speech_recognition.set_speech_recognition_details(grammar, model)
             asyncio.run(speech_recognition.start_speech_recognition(None))
-            time.sleep(10)
 
         elif first_arg == "service" or second_arg == "service":
             logging.info("Starting gRPC server mode")
@@ -79,6 +76,7 @@ def cli():
 
     except Exception as e:
         logging.error(e)
+        logging.error(traceback.format_exc())
 
     time.sleep(5)
 
@@ -90,9 +88,9 @@ def get_arg_value(arg: str):
 
 def get_arg_flag(arg: str):
     for current_arg in sys.argv:
-        if current_arg.startswith(arg):
-            return get_single_arg(current_arg, arg)
-    return None
+        if current_arg == arg:
+            return True
+    return False
 
 def get_single_arg(arg: str, command: str):
     if arg.startswith(command + "=\""):

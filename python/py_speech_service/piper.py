@@ -1,3 +1,4 @@
+import logging
 import os
 import subprocess
 from pathlib import Path
@@ -93,10 +94,23 @@ class Piper(PiperSpeaker):
             check=True
         )
 
-    def text_to_pydub(self, text: str, rate: float = 1) -> Optional[AudioSegment]:
-        f = APP_DIR / f"{get_random_name()}.wav"
+    def create_file(self, text: str, rate: float = 1, file_path: Optional[str] = None) -> Optional[str]:
+        file = file_path
+        if file is None:
+            file = os.path.join(APP_DIR, f"{get_random_name()}.wav")
+
         try:
-            self.text_to_wav(text, str(f), rate)
+            logging.info("Creating file " + file)
+            self.text_to_wav(text, file, rate)
+            logging.info("Created file " + file)
+            return file
+        except Exception as e:
+            return None
+
+
+    def text_to_pydub(self, text: str, rate: float = 1, file_name: Optional[str] = None) -> Optional[AudioSegment]:
+        f = self.create_file(text, rate, file_name)
+        try:
             audio_segment = AudioSegment.from_file(f, format="wav")
         finally:
             if f.exists():

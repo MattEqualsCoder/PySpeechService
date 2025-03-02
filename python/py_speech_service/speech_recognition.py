@@ -2,9 +2,11 @@ import asyncio
 import json
 import logging
 import os
+import queue
+import traceback
 from typing import Optional
-from urllib.request import urlretrieve
 
+import sounddevice as sd
 from platformdirs import user_data_dir
 from vosk import Model, KaldiRecognizer, SetLogLevel
 
@@ -12,8 +14,6 @@ from py_speech_service import speech_service_pb2
 from py_speech_service.downloader import get_json_data, download_and_extract
 from py_speech_service.grammar_parser import GrammarParser
 
-import queue
-import sounddevice as sd
 
 class SpeechRecognition:
     model: Model
@@ -84,6 +84,7 @@ class SpeechRecognition:
     async def start_speech_recognition(self, context):
         asyncio.create_task(self.process_recognition_queue())
         await asyncio.to_thread(self.listen)
+        await asyncio.sleep(10)
 
     async def process_recognition_queue(self):
         logging.info("Started processing speech recognition queue")
@@ -127,9 +128,8 @@ class SpeechRecognition:
                                    callback=record_callback):
                 response = speech_service_pb2.SpeechServiceResponse()
                 response.speech_recognition_started.successful = True
-                logging.info("Before")
-                asyncio.run(self.grpc_response_queue.put(response))
-                logging.info("After")
+                if self.grpc_response_queue:
+                    asyncio.run(self.grpc_response_queue.put(response))
                 while not stop_speech_recognition_event.is_set() and not self.shutdown_event.is_set():
                     data = speech_queue.get()
                     if recognizer.AcceptWaveform(data):
@@ -145,15 +145,18 @@ class SpeechRecognition:
             print("Error from VOSK: " + str(e))
             logging.error("Error from VOSK: " + str(e))
             logging.error(e)
+            logging.error(traceback.format_exc())
 
     async def process_speech(self, recognizer_result: str):
         try:
             result_dict = json.loads(recognizer_result)
             text_recognized = result_dict.get("text", "")
             if not text_recognized == "":
+
                 match = self.grammar_parser.find_match(text_recognized, self.required_confidence)
 
                 if match is not None:
+                    logging.info("Matched text \"" + match.matched_text + "\" (heard \"" + text_recognized + "\"")
                     if self.grpc_response_queue:
                         response = speech_service_pb2.SpeechServiceResponse()
                         response.speech_recognized.heard_text = text_recognized
@@ -164,11 +167,14 @@ class SpeechRecognition:
                         await self.grpc_response_queue.put(response)
                     else:
                         print("I heard: '" + text_recognized + "', but I am " + str(round(match.confidence, 2)) + "% sure you said '" + match.matched_text + "'")
+                else:
+                    logging.debug("Recognized text " + text_recognized)
 
         except Exception as e:
             print("Error processing speech: " + str(e))
             logging.error("Error processing speech")
             logging.error(e)
+            logging.error(traceback.format_exc())
 
     def set_grpc_response_queue(self, queue: asyncio.Queue):
         self.grpc_response_queue = queue

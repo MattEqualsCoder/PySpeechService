@@ -3,30 +3,41 @@ using PySpeechServiceClient.Models;
 
 namespace PySpeechServiceClient.Grammar;
 
-public class SpeechRecognitionGrammar (GrammarElement element)
+/// <summary>
+/// Built object housing a grammar rule to be used for speech recognition
+/// </summary>
+public class SpeechRecognitionGrammar
 {
-    public GrammarElement RuleGrammarElement => element;
+    internal GrammarElement RuleGrammarElement { get; }
 
+    internal SpeechRecognitionGrammar(GrammarElement element)
+    {
+        RuleGrammarElement = element;
+    }
+
+    /// <summary>
+    /// The name of the rule
+    /// </summary>
     public string? RuleName
     {
-        get => element.Key;
-        set => element.Key = value;
+        get => RuleGrammarElement.Key;
+        set => RuleGrammarElement.Key = value;
     }
 
+    /// <summary>
+    /// Returns a list of strings for displaying to the user what phrases can be
+    /// stated for this particular roll
+    /// </summary>
+    public ICollection<string> HelpText => RuleGrammarElement.GetHelpText();
+
+    // Event for this rule has been recognized by speech recognized
     public event EventHandler<SpeechRecognitionResultEventArgs>? SpeechRecognized;
 
-    public void OnSpeechRecognized(string text, float confidence, Dictionary<string, SpeechRecognitionSemantic>? semantics = null,
-        System.Speech.Recognition.RecognitionResult? nativeResult = null)
-    {
-        SpeechRecognized?.Invoke(this, new SpeechRecognitionResultEventArgs(new SpeechRecognitionResult()
-        {
-            Text = text,
-            Confidence = confidence,
-            Semantics = semantics ?? [],
-            NativeResult = nativeResult   
-        }));
-    }
-    
+    /// <summary>
+    /// Converts the grammar into a native System.Speech grammar object to be used
+    /// with Windows built-in speech recognition
+    /// </summary>
+    /// <returns>The generated System.Speech grammar object</returns>
     [SupportedOSPlatform("windows")]
     public System.Speech.Recognition.Grammar BuildSystemSpeechGrammar()
     {
@@ -38,7 +49,7 @@ public class SpeechRecognitionGrammar (GrammarElement element)
             Name = RuleName,
         };
 
-        grammar.SpeechRecognized += (sender, args) =>
+        grammar.SpeechRecognized += (_, args) =>
         {
             OnSpeechRecognized(args.Result.Text, args.Result.Confidence,
                 args.Result.Semantics.ToDictionary(x => x.Key,
@@ -46,5 +57,17 @@ public class SpeechRecognitionGrammar (GrammarElement element)
         };
         
         return grammar;
+    }
+    
+    internal void OnSpeechRecognized(string text, float confidence, Dictionary<string, SpeechRecognitionSemantic>? semantics = null,
+        System.Speech.Recognition.RecognitionResult? nativeResult = null)
+    {
+        SpeechRecognized?.Invoke(this, new SpeechRecognitionResultEventArgs(new SpeechRecognitionResult()
+        {
+            Text = text,
+            Confidence = confidence,
+            Semantics = semantics ?? [],
+            NativeResult = nativeResult   
+        }));
     }
 }

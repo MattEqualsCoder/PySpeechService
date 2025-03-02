@@ -1,16 +1,56 @@
+// ReSharper disable UnusedAutoPropertyAccessor.Global
 namespace PySpeechServiceClient.Models;
 
+/// <summary>
+/// Class that is returned when the PySpeechService TTS starts or stops
+/// saying a line
+/// </summary>
 public class SpeakCommandResponse
 {
-    public string FullMessage { get; set; } = "";
-    public string CurrentChunk { get; set; } = "";
-    public bool IsStartOfMessage { get; set; }
-    public bool IsStartOfChunk { get; set; }
-    public bool IsEndOfMessage { get; set; }
-    public bool IsEndOfChunk { get; set; }
+    /// <summary>
+    /// The original full request sent to TTS
+    /// </summary>
+    public string FullMessage { get; internal init; } = "";
+    
+    /// <summary>
+    /// The current line being stated by TTS
+    /// </summary>
+    public string CurrentChunk { get; internal init; } = "";
+    
+    /// <summary>
+    /// If this is the start of first line of the full request
+    /// </summary>
+    public bool IsStartOfMessage { get; internal init; }
+    
+    /// <summary>
+    /// If this is the start of a spoken line
+    /// </summary>
+    public bool IsStartOfChunk { get; internal init; }
+    
+    /// <summary>
+    /// If this is the end of the last line of a full request
+    /// </summary>
+    public bool IsEndOfMessage { get; internal init; }
+    
+    /// <summary>
+    /// If this is the end of a spoken line
+    /// </summary>
+    public bool IsEndOfChunk { get; internal init; }
+    
+    /// <summary>
+    /// If there is another queued message after this one
+    /// </summary>
+    public bool HasAnotherRequest { get; internal init; }
 }
 
+/// <summary>
+/// EventArgs for receiving an update from PySpeechService's TTS
+/// </summary>
+/// <param name="response"></param>
 public class SpeakCommandResponseEventArgs(SpeakCommandResponse response) : EventArgs
 {
+    /// <summary>
+    /// Response objects with the current details from TTS
+    /// </summary>
     public SpeakCommandResponse Response { get; } = response;
 }

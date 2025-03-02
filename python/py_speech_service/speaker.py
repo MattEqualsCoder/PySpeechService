@@ -1,13 +1,18 @@
 import asyncio
 import json
 import logging
+import os
 import re
+import tempfile
 import typing
+from pathlib import Path
 
-import pyaudio
 import numpy
+import pyaudio
+from pydub import AudioSegment
 from pydub.silence import detect_leading_silence
 from pydub.utils import make_chunks
+from yapper.utils import get_random_name
 
 from py_speech_service import speech_service_pb2
 from py_speech_service.piper import Piper
@@ -59,6 +64,10 @@ class PendingSpeechRequest:
     original_message: str
     first_request_of_message: bool
     last_request_of_message: bool
+    file_path: str
+
+    def __init__(self):
+        self.file_path = os.path.join(tempfile.gettempdir(), "py_speech_service", get_random_name(20) + ".wav")
 
     def to_string(self):
         data = {
@@ -73,12 +82,11 @@ class PendingSpeechRequest:
             "pitch_modifier": str(self.speech_settings.pitch) if hasattr(self, "speech_settings") else "",
         }
         return json.dumps(data)
-    
-
 
 class Speaker:
 
-    speech_queue: asyncio.Queue[PendingSpeechRequest] = asyncio.Queue()
+    process_queue: asyncio.Queue[PendingSpeechRequest] = asyncio.Queue()
+    play_queue: asyncio.Queue[PendingSpeechRequest] = asyncio.Queue()
     grpc_response_queue: typing.Optional[asyncio.Queue] = None
     shutdown_event = asyncio.Event()
     stop_talking_event = asyncio.Event()
@@ -86,12 +94,18 @@ class Speaker:
     speech_settings: SpeechSettings = SpeechSettings()
     piper: typing.Optional[Piper] = None
     is_done = False
+    is_speaking = False
 
     def start(self):
-        asyncio.create_task(self.process_speech_queue())
+        folder = os.path.join(tempfile.gettempdir(), "py_speech_service")
+        if not Path(folder).exists():
+            Path(folder).mkdir()
+        asyncio.create_task(self.handle_process_queue())
+        asyncio.create_task(self.handle_play_queue())
 
     async def speak_basic_line(self, line: str):
-        asyncio.create_task(self.process_speech_queue())
+        asyncio.create_task(self.handle_process_queue())
+        asyncio.create_task(self.handle_play_queue())
         response_queue = asyncio.Queue()
         self.set_grpc_response_queue(response_queue)
         await self.speak(line)
@@ -113,40 +127,69 @@ class Speaker:
         response.speech_settings_set.successful = True
         asyncio.create_task(self.grpc_response_queue.put(response))
 
-    async def process_speech_queue(self):
-        logging.info("Started processing speech queue")
-        print("Started processing speech queue")
+    async def handle_process_queue(self):
+        logging.info("Started handling process queue")
+        print("Started handling process queue")
         while not self.shutdown_event.is_set():  # Keep running unless shutdown is triggered
             try:
-                item = await asyncio.wait_for(self.speech_queue.get(), timeout=1.0)  # Wait for 1 second
-                await self.__handle_request(item)
+                item = await asyncio.wait_for(self.process_queue.get(), timeout=.25)  # Wait for 1 second
+                await asyncio.create_task(self.__handle_request(item))
             except asyncio.TimeoutError:
                 continue  # Retry checking
-        logging.info("Stopped processing speech queue")
-        print("Stopped processing speech queue")
-        while not self.speech_queue.empty():
-            self.speech_queue.get_nowait()
-            self.speech_queue.task_done()
+        logging.info("Stopped handling process queue")
+        print("Stopped handling process queue")
+        while not self.process_queue.empty():
+            self.process_queue.get_nowait()
+            self.process_queue.task_done()
+
+    async def handle_play_queue(self):
+        logging.info("Started handling play queue")
+        print("Started handling play queue")
+        while not self.shutdown_event.is_set():  # Keep running unless shutdown is triggered
+            try:
+                item = await asyncio.wait_for(self.play_queue.get(), timeout=.25)
+                await asyncio.create_task(self.__handle_play(item))
+            except asyncio.TimeoutError:
+                continue  # Retry checking
+        logging.info("Stopped handling play queue")
+        print("Stopped handling play queue")
+        while not self.play_queue.empty():
+            self.play_queue.get_nowait()
+            self.play_queue.task_done()
 
     def set_grpc_response_queue(self, queue: asyncio.Queue):
         self.grpc_response_queue = queue
 
+    def split_into_lines(self, paragraph: str, words_per_line: int) -> list[str]:
+        words = paragraph.split()  # Split by spaces
+        return [' '.join(words[i:i + words_per_line]) for i in range(0, len(words), words_per_line)]
+
     async def speak(self, message: str, settings: typing.Optional[SpeechSettings] = None):
 
-        request = PendingSpeechRequest()
-
-        if settings is None:
-            request.speech_settings = SpeechSettings(self.speech_settings)
-        else:
-            request.speech_settings = SpeechSettings(settings)
+        self.stop_talking_event.clear()
 
         if not message.__contains__("</") and not message.__contains__("/>"):
-            request.message = message
-            request.original_message = message
-            request.first_request_of_message = True
-            request.last_request_of_message = True
-            await self.speech_queue.put(request)
+            lines = re.split(r'(?<=[.!?])\s+|\n+', message)
+            for line in lines:
+                request = PendingSpeechRequest()
+                if settings is None:
+                    request.speech_settings = SpeechSettings(self.speech_settings)
+                else:
+                    request.speech_settings = SpeechSettings(settings)
+                request.message = line
+                request.original_message = message
+                request.first_request_of_message = line == lines[0]
+                request.last_request_of_message = line == lines[len(lines)-1]
+
+                await self.process_queue.put(request)
         else:
+            request = PendingSpeechRequest()
+
+            if settings is None:
+                request.speech_settings = SpeechSettings(self.speech_settings)
+            else:
+                request.speech_settings = SpeechSettings(settings)
+
             parts = self.__split_by_tags(message)
             requests: list[PendingSpeechRequest] = []
             tags: list[str] = []
@@ -155,13 +198,17 @@ class Speaker:
                 if part == '':
                     continue
                 if part.startswith("<break"):
-                    requests.append(self.__create_ssml_request(request, part, tags))
+                    break_request = self.__create_ssml_request(request, part, tags)
+                    if break_request is not None:
+                        requests.append(break_request)
                 elif part.startswith("</"):
                     tags.pop()
                 elif part.startswith("<"):
                     tags.append(part)
                 else:
-                    requests.append(self.__create_ssml_request(request, part, tags))
+                    lines = re.split(r'(?<=[.!?])\s+', part)
+                    for line in lines:
+                        requests.append(self.__create_ssml_request(request, line, tags))
 
             is_first: bool = True
             last_request = requests[len(requests)-1]
@@ -169,14 +216,21 @@ class Speaker:
                 request.first_request_of_message = is_first
                 request.last_request_of_message = request == last_request
                 request.original_message = message
+
                 is_first = False
-                await self.speech_queue.put(request)
+                await self.process_queue.put(request)
 
     def stop_speaking(self):
         try:
-            while not self.speech_queue.empty():
-                self.speech_queue.get_nowait()
-                self.speech_queue.task_done()
+            while not self.process_queue.empty():
+                self.process_queue.get_nowait()
+                self.process_queue.task_done()
+            while not self.play_queue.empty():
+                request = self.play_queue.get_nowait()
+                f = Path(request.file_path)
+                if f.exists():
+                    os.remove(f)
+                self.play_queue.task_done()
         except Exception as e:
             logging.info("Cleared speech queue")
             print("Cleared speech queue")
@@ -188,7 +242,7 @@ class Speaker:
 
     @staticmethod
     def __split_by_tags(html: str) -> list[str]:
-        pattern = r"(</?[^>]+>)|([^<]+)"
+        pattern = r"(</?[^>]+>)|([^<\n]+)"
         matches = re.findall(pattern, html)
         result = [match[0].strip() or match[1].strip() for match in matches if match[0] or match[1]]
         return result
@@ -199,7 +253,7 @@ class Speaker:
         attributes = dict(re.findall(pattern, tag))
         return attributes
 
-    def __create_ssml_request(self, initial_request: PendingSpeechRequest, message: str, prosody_tags: list[str]) -> PendingSpeechRequest:
+    def __create_ssml_request(self, initial_request: PendingSpeechRequest, message: str, prosody_tags: list[str]) -> typing.Optional[PendingSpeechRequest]:
         request = PendingSpeechRequest()
         request.speech_settings = SpeechSettings(initial_request.speech_settings)
 
@@ -213,7 +267,7 @@ class Speaker:
                 else:
                     request.silence_seconds = 1
             elif attr.__contains__("strength"):
-                if attr["strength"] == "small":
+                if attr["strength"] == "small" or attr["strength"] == "weak":
                     request.silence_seconds = .25
                 elif attr["strength"] == "large":
                     request.silence_seconds = 2.5
@@ -221,7 +275,9 @@ class Speaker:
                     request.silence_seconds = 1
             else:
                 request.silence_seconds = 1
-
+            request.silence_seconds = request.silence_seconds - .5
+            if request.silence_seconds <= 0:
+                return None
         else:
             for tag in prosody_tags:
                 if tag.startswith("<prosody"):
@@ -304,32 +360,52 @@ class Speaker:
         if self.grpc_response_queue:
             response = speech_service_pb2.SpeechServiceResponse()
             response.speak_update.message = request.original_message
-            response.speak_update.chunk = request.message
+            if hasattr(request, "message") and request.message:
+                response.speak_update.chunk = request.message
+            elif hasattr(request, "silence_seconds") and request.silence_seconds:
+                response.speak_update.chunk = "<break time='" + str(request.silence_seconds) + "s'/>"
             response.speak_update.is_start_of_message = is_start and request.first_request_of_message
             response.speak_update.is_start_of_chunk = is_start
             response.speak_update.is_end_of_message = not is_start and (request.last_request_of_message or self.stop_talking_event.is_set())
             response.speak_update.is_end_of_chunk = not is_start
+            response.speak_update.has_another_request = not self.process_queue.empty() or not self.play_queue.empty()
             await self.grpc_response_queue.put(response)
 
-    async def __handle_request(self, request: PendingSpeechRequest):
+    def __update_piper(self, request: PendingSpeechRequest) -> SpeechSettings:
+        speech_settings = self.speech_settings
+        if hasattr(request, "speech_settings"):
+            speech_settings = request.speech_settings
+
+        if hasattr(request, "use_alt_voice") and request.use_alt_voice:
+            self.piper.set_speech_settings(speech_settings.alt_onnx_path, speech_settings.alt_config_path,
+                                           speech_settings.alt_model_name)
+        else:
+            self.piper.set_speech_settings(speech_settings.onnx_path, speech_settings.config_path,
+                                           speech_settings.model_name)
+
+        return speech_settings
+
+    def __load_audio_file(self, file: str):
+        f = Path(file)
+        try:
+            return AudioSegment.from_file(f, format="wav")
+        finally:
+            if f.exists():
+                os.remove(f)
+
+    async def __handle_play(self, request: PendingSpeechRequest):
         self.is_speaking = True
-
         if hasattr(request, "message") and request.message:
-
+            logging.debug("Playing " + request.message)
             await self.__send_response(request, True)
 
             speech_settings = self.speech_settings
             if hasattr(request, "speech_settings"):
                 speech_settings = request.speech_settings
+            sound = self.__load_audio_file(request.file_path)
 
-            if hasattr(request, "use_alt_voice") and request.use_alt_voice:
-                self.piper.set_speech_settings(speech_settings.alt_onnx_path, speech_settings.alt_config_path,
-                                               speech_settings.alt_model_name)
-            else:
-                self.piper.set_speech_settings(speech_settings.onnx_path, speech_settings.config_path,
-                                               speech_settings.model_name)
+            logging.debug("Loaded audio file " + request.file_path)
 
-            sound = self.piper.text_to_pydub(request.message, speech_settings.speed)
             frame_rate_modifier = 1
 
             if speech_settings.gain != 0:
@@ -346,13 +422,10 @@ class Speaker:
                             rate=sound.frame_rate,
                             output=True)
 
-            logging.info("Saying: " + str(request.message))
+            logging.debug("Starting stream")
 
             try:
-                for chunk in make_chunks(sound, 500):
-                    if not self.stop_talking_event.is_set() and not self.shutdown_event.is_set():
-                        await asyncio.to_thread(stream.write, chunk._data)
-
+                await asyncio.to_thread(self.__write_sound_data, sound, stream)
             finally:
                 await self.__send_response(request, False)
                 stream.stop_stream()
@@ -360,6 +433,30 @@ class Speaker:
                 p.terminate()
                 self.stop_talking_event.clear()
                 self.is_speaking = False
+                logging.info("Finished saying \"" + request.message + "\"")
+
+            await asyncio.sleep(.5)
+
         elif hasattr(request, "silence_seconds") and request.silence_seconds:
             await asyncio.sleep(request.silence_seconds)
             self.is_speaking = False
+            if request.last_request_of_message:
+                await self.__send_response(request, False)
+
+    async def __handle_request(self, request: PendingSpeechRequest):
+        if hasattr(request, "message") and request.message:
+            try:
+                speech_settings = self.__update_piper(request)
+                await asyncio.to_thread(self.piper.text_to_wav, request.message, request.file_path, speech_settings.speed)
+                logging.info("Wrote to file " + request.file_path)
+                await self.play_queue.put(request)
+            except Exception as e:
+                logging.error(e)
+                logging.error(traceback.format_exc())
+        elif hasattr(request, "silence_seconds") and request.silence_seconds:
+            await self.play_queue.put(request)
+
+    def __write_sound_data(self, sound: AudioSegment, stream: pyaudio.Stream):
+        for chunk in make_chunks(sound, 500):
+            if not self.stop_talking_event.is_set() and not self.shutdown_event.is_set():
+                stream.write(chunk._data)

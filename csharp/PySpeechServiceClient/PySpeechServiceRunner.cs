@@ -16,16 +16,27 @@ class PySpeechServiceInitResponse
     public int Port { get; init; }
 }
 
+internal class DebugJsonFileData
+{
+    public string? Python { get; set; }
+    public string? MainPyFile { get; set; }
+}
+
 internal class PySpeechServiceRunner(IServiceProvider serviceProvider) : IDisposable
 {
+    public static readonly string RequiredPySpeechServiceVersion = "0.0.4";
+    
     private readonly ILogger<PySpeechServiceRunner>? _logger = serviceProvider.GetService<ILogger<PySpeechServiceRunner>>();
     private string? _previousOutput;
     private Process? _process;
+    private List<string> _ignoredWords = [];
 
     public int Port { get; private set; }
 
     public bool IsRunning => _process?.HasExited == false;
-
+    
+    public ICollection<string> IgnoredWords => _ignoredWords.ToList();
+ 
     public event EventHandler? ProcessEnded;
 
     public async Task<bool> StartAsync()
@@ -55,13 +66,22 @@ internal class PySpeechServiceRunner(IServiceProvider serviceProvider) : IDispos
     {
         List<(string, string)> commands = [];
 
-#if DEBUG
-        commands.Add(("/home/matt/.cache/pypoetry/virtualenvs/py-speech-service-r00qpw04-py3.12/bin/python", "/home/matt/Source/PySpeechService/python/py_speech_service/__main__.py"));
-        _logger?.LogInformation("Adding debug option {Command1} {Command2}", commands[0].Item1, commands[0].Item2);
-#endif
-
         var localAppDataFolder = Path.Combine(Environment.GetFolderPath(Environment.SpecialFolder.LocalApplicationData),
             "py_speech_service");
+        
+#if DEBUG
+        var debugFilePath = Path.Combine(localAppDataFolder, "debug.json");
+        if (File.Exists(debugFilePath))
+        {
+            var jsonText = File.ReadAllText(debugFilePath);
+            var obj = JsonSerializer.Deserialize<DebugJsonFileData>(jsonText);
+            if (!string.IsNullOrEmpty(obj?.Python) && !string.IsNullOrEmpty(obj.MainPyFile))
+            {
+                _logger?.LogInformation("Adding debug option {Command1} {Command2}", obj.Python, obj.MainPyFile);
+                commands.Add((obj.Python, obj.MainPyFile));
+            }
+        }
+#endif
             
         if (OperatingSystem.IsWindows())
         {
@@ -87,7 +107,12 @@ internal class PySpeechServiceRunner(IServiceProvider serviceProvider) : IDispos
 
     private async Task<bool> AttemptCommand((string, string) command)
     {
-        if (!RunInternalAsync(command, "service"))
+        var arguments = "service";
+#if DEBUG
+        arguments += " -d";
+#endif
+        
+        if (!RunInternalAsync(command, arguments))
         {
             _logger?.LogError("Process could not be started");
             return false;
@@ -136,10 +161,22 @@ internal class PySpeechServiceRunner(IServiceProvider serviceProvider) : IDispos
                 _logger?.LogError("Received unexpected response {Response}", _previousOutput);
                 return false;
             }
+
+            var requiredVersion = VersionStringToInt(RequiredPySpeechServiceVersion)!;
+            var version = VersionStringToInt(response.Version);
+
+            if (version > requiredVersion)
+            {
+                _logger?.LogInformation("PySpeechService {Version} started on port {Port}", $"v{response.Version}", response.Port);
+                Port = response.Port;
+                return true;
+            }
+            else
+            {
+                _logger?.LogError("Invalid PySpeechService version of v{ResponseVersion}. Version v{RequiredVersion} required.", response.Version, RequiredPySpeechServiceVersion);
+                return false;
+            }
             
-            _logger?.LogInformation("PySpeechService {Version} started on port {Port}", $"v{response.Version}", response.Port);
-            Port = response.Port;
-            return true;
         }
         catch (Exception e)
         {
@@ -152,6 +189,8 @@ internal class PySpeechServiceRunner(IServiceProvider serviceProvider) : IDispos
     {
         try
         {
+            _ignoredWords = [];
+            
             ProcessStartInfo procStartInfo;
             _previousOutput = null;
             
@@ -211,7 +250,16 @@ internal class PySpeechServiceRunner(IServiceProvider serviceProvider) : IDispos
         {
             return;
         }
-        _logger?.LogError("Received error from PySpeechService: {Error}", e.Data);
+
+        if (e.Data.Contains("Ignoring word missing in vocabulary"))
+        {
+            _ignoredWords.Add(e.Data[e.Data.IndexOf('\'')..]);
+        }
+        else
+        {
+            _logger?.LogError("Received error from PySpeechService: {Error}", e.Data);
+        }
+        
     }
 
     private void ProcessOnOutputDataReceived(object sender, DataReceivedEventArgs e)
@@ -231,5 +279,22 @@ internal class PySpeechServiceRunner(IServiceProvider serviceProvider) : IDispos
     {
         _process?.Kill();
         _process?.Dispose();
+    }
+
+    private static int? VersionStringToInt(string version)
+    {
+        var versionParts = version.Split(".");
+        if (versionParts.Length != 3)
+        {
+            return null;
+        }
+
+        if (!int.TryParse(versionParts[0], out var partOne) || !int.TryParse(versionParts[1], out var partTwo) ||
+            !int.TryParse(versionParts[2], out var partThree))
+        {
+            return null;
+        }
+        
+        return partOne * 1000000 + partTwo * 1000 + partThree;
     }
 }

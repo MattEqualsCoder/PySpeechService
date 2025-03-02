@@ -1,11 +1,15 @@
-import json, re
+import json
 import logging
+import random
+import re
 import typing
 
 import num2words
 from rapidfuzz import process
+
 from py_speech_service.grammar_element import GrammarRuleElement, GrammarElementType, GrammarElementLookupItem, \
     GrammarElementMatch
+
 
 class GrammarParser:
 
@@ -14,15 +18,46 @@ class GrammarParser:
     pattern = re.compile('[^\\w ]+')
     max_phrase_word_count: int = 0
     all_words: list[str] = []
+    phrase_replacement_map: dict[str, list[str]]
+    phrase_replacement_regex: str
+    replacement_map: dict[str, str]
+    replacement_regex: str
 
     def set_grammar_file(self, file_path: str):
         with open(file_path, 'r') as fp:
             lines = fp.read()
 
+        self.all_words = []
+        self.replacement_map = {}
+        self.phrase_replacement_map = {}
+
         json_data = json.loads(lines)
-        for rule in json_data:
+
+        logging.info("Loaded grammar json data file " + file_path)
+
+        for find_text, replace_with in json_data["Replacements"].items():
+            find_text_str = str(find_text).lower()
+            replace_with_str = str(replace_with).lower()
+            self.replacement_map[find_text_str] = replace_with_str
+            self.all_words.append(find_text_str)
+
+            if not self.phrase_replacement_map.__contains__(replace_with_str):
+                self.phrase_replacement_map[replace_with_str] = []
+            self.phrase_replacement_map[replace_with_str].append(find_text_str)
+
+        logging.info("Loaded " + str(len(json_data["Replacements"])) + " replacements")
+
+        sorted_replacement_keys = sorted(self.replacement_map.keys(), key=len, reverse=True)
+        self.replacement_regex = r'(' + '|'.join(map(re.escape, sorted_replacement_keys)) + r')'
+
+        sorted_replacement_keys = sorted(self.phrase_replacement_map.keys(), key=len, reverse=True)
+        self.phrase_replacement_regex = r'\b(' + '|'.join(map(re.escape, sorted_replacement_keys)) + r')\b'
+
+        for rule in json_data["Rules"]:
             rule_name: str = rule["Key"]
             self.__parse_rule_element(rule_name, rule)
+
+        logging.info("Loaded " + str(len(json_data["Rules"])) + " rules")
 
         self.all_words = list(set(self.all_words))
         updated_words = []
@@ -43,6 +78,7 @@ class GrammarParser:
             return None
         if prefix_result[1] < min_prefix_threshold:
             return None
+        prefix_confidence = prefix_result[1]
         search_words[0] = "hey"
         search_words[1] = "tracker"
         search_text = " ".join(search_words)
@@ -56,7 +92,7 @@ class GrammarParser:
             if search_result is not None and search_result[1] > min_threshold:
                 possibilities.append(search_result)
 
-        matches: [GrammarElementMatch] = []
+        matches: dict[str, GrammarElementMatch] = {}
         searched_phrases: [str] = []
         for possibility in possibilities:
             search_phrase = possibility[0]
@@ -67,39 +103,33 @@ class GrammarParser:
             possible_elements = self.phrase_map.get(search_phrase)
             searched_elements = []
             for possible_element in possible_elements:
-                if searched_elements.__contains__(possible_element.rule_name + possible_element.phrase):
-                    continue
-                searched_elements.append(possible_element.rule_name + possible_element.phrase)
                 if possible_element.is_full_match:
                     if initial_confidence > min_threshold:
                         match = GrammarElementMatch(possible_element.rule_name, stated_text, search_phrase, initial_confidence)
-                        matches.append(match)
+                        matches[match.matched_text] = match
                 else:
                     best_item = self.__find_best_element(search_text, search_phrase, possible_element)
                     if best_item is not None and best_item[1] > min_threshold:
                         match = GrammarElementMatch(possible_element.rule_name, stated_text, best_item[0],
                                                     best_item[1], best_item[2])
-                        matches.append(match)
+                        matches[match.matched_text] = match
 
         if len(matches) == 0:
             return None
         else:
-            best_match: typing.Optional[GrammarElementMatch] = None
-            longest_match: typing.Optional[GrammarElementMatch] = None
-            for match in matches:
-                if best_match is None:
-                    best_match = match
-                    longest_match = match
-                else:
-                    if len(match.matched_text) > len(best_match.matched_text):
-                        longest_match = match
-                    if match.confidence > best_match.confidence:
-                        best_match = match
+            closest_sentence = self.__find_closest_sentence(matches.keys(), search_text)
+            if closest_sentence is None:
+                return None
+            selected_match = matches[closest_sentence[0]]
+            selected_match.confidence = (closest_sentence[1] + selected_match.confidence) / 2
 
-            if longest_match.confidence >= best_match.confidence - 5:
-                return longest_match
-            else:
-                return best_match
+            if selected_match.confidence > 98:
+                selected_match.confidence = selected_match.confidence - random.uniform(0.5, 2.5)
+
+            selected_match.matched_text = re.sub(self.replacement_regex, lambda regex_match: self.replacement_map[regex_match.group(0)],
+                                 selected_match.matched_text)
+
+            return selected_match
 
     def __parse_rule_element(self, rule_name: str, rule_element):
 
@@ -134,11 +164,24 @@ class GrammarParser:
                     optional_phrases.append("")
                     element_phrases = self.__permutate_elements(element_phrases, optional_phrases)
             elif element_type == GrammarElementType.KeyValue:
+                items = []
                 for key_value_json in sub_element_json['Data']:
                     key = key_value_json['Key']
                     if key.isnumeric():
                         key = num2words.num2words(key).replace("-", " ")
-                    words.append(key)
+                    key = str(key).lower()
+
+                    match = re.search(self.phrase_replacement_regex, key)
+                    if match:
+                        replacements = self.phrase_replacement_map[match.group()]
+                        for replacement in replacements:
+                            new_key = str(key).replace(match.group(), replacement)
+                            items.append({ "Key": new_key, "Value" : key_value_json['Value']})
+                            words.append(new_key)
+                    else:
+                        items.append(key_value_json)
+                        words.append(key)
+                sub_element_json['Data'] = items
                 is_exact = False
             elif element_type == GrammarElementType.GrammarElementList:
                 for grammar_list_item in sub_element_json['Data']:
@@ -244,7 +287,7 @@ class GrammarParser:
 
         best_result = None
         previous_search_phrase = ""
-        for num_words in range(min_word_count, max_word_count+1):
+        for num_words in range(min_word_count, max_word_count+2):
             new_search_phrase = " ".join(search_words[0:num_words])
             if new_search_phrase == previous_search_phrase:
                 break
@@ -253,7 +296,7 @@ class GrammarParser:
             if result is not None:
                 if best_result is None:
                     best_result = result
-                elif result[1] >= best_result[1] - 5:
+                elif result[1] >= best_result[1] - 2:
                     best_result = result
 
         if best_result is None:

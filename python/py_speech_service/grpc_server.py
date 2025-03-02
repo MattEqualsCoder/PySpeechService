@@ -61,6 +61,9 @@ class GrpcServer:
         async for request in request_iterator:
             try:
                 self.last_message = time.time()
+
+                logging.debug(str(request))
+
                 if request.HasField("start_speech_recognition"):
                     logging.info("Received gRPC start_speech_recognition request")
                     print("Received gRPC start_speech_recognition request")
@@ -90,6 +93,7 @@ class GrpcServer:
                         response.speech_settings_set.successful = True
                         await self.response_queue.put(response)
                         logging.error("Error initializing speech settings: " + repr(e))
+                        logging.error(traceback.format_exc())
                         response = speech_service_pb2.SpeechServiceResponse()
                         response.error.error_message = "Error initializing speech settings"
                         response.error.exception = repr(e)
@@ -97,7 +101,7 @@ class GrpcServer:
 
                 elif request.HasField("speak"):
                     logging.info(
-                        "Received gRPC speak request: " + str(request.speak))
+                        "Received gRPC speak request: \"" + ' '.join(request.speak.message.splitlines()) + "\"")
                     print("Received gRPC speak request")
 
                     if self.speech_initialized:
@@ -126,9 +130,14 @@ class GrpcServer:
                     response = speech_service_pb2.SpeechServiceResponse()
                     response.ping.time = str(datetime.datetime.now())
                     await self.response_queue.put(response)
+                elif request.HasField("stop_speech_recognition"):
+                    print("Received stop speech recognition request")
+                    self.speech_recognition.stop_speech_recognition()
+
             except Exception as e:
                 logging.error("Exception starting speech service: " + str(e))
                 logging.error(repr(e))
+                logging.error(traceback.format_exc())
                 print_exception(value = e)
                 response = speech_service_pb2.SpeechServiceResponse()
                 response.error.error_message = "Exception starting speech service"

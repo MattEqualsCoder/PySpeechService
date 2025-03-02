@@ -1,14 +1,82 @@
 ﻿using System.Runtime.Versioning;
 using System.Speech.Recognition;
-using System.Text.Json;
 
 namespace PySpeechServiceClient.Grammar;
 
-public class GrammarElement(GrammarElementType type, object? data = null, string? key = null)
+internal class GrammarElement(GrammarElementType type, object? data = null, string? key = null)
 {
     public GrammarElementType Type { get; set; } = type;
     public string? Key { get; set; } = key;
     public object Data { get; set; } = data ?? string.Empty;
+
+    public ICollection<string> GetHelpText()
+    {
+        List<string> toReturn = [];
+
+        if (Type == GrammarElementType.Rule)
+        {
+            if (Data is not List<GrammarElement> elements)
+            {
+                throw new InvalidOperationException("Data must be a list of grammar elements.");
+            }
+
+            if (elements.FirstOrDefault()?.Type == GrammarElementType.GrammarElementList)
+            {
+                toReturn.AddRange(elements.SelectMany(x => x.GetHelpText()));
+            }
+            else
+            {
+                toReturn.Add(string.Join(" ", elements.SelectMany(x => x.GetHelpText())));
+            }
+        }
+        else if (Type == GrammarElementType.String)
+        {
+            if (Data is not string text)
+            {
+                throw new InvalidOperationException("Data must be a string.");
+            }
+            toReturn.Add(text.Trim());
+        }
+        else if (Type == GrammarElementType.OneOf)
+        {
+            if (Data is not string[] choices)
+            {
+                throw new InvalidOperationException("Data must be a string array.");
+            }
+            toReturn.Add("[" + string.Join("/", choices.Select(x => x.Trim())) + "]");
+        }
+        else if (Type == GrammarElementType.Optional)
+        {
+            if (Data is not string[] choices)
+            {
+                throw new InvalidOperationException("Data must be a string array.");
+            }
+            toReturn.Add("(" + string.Join("/", choices.Select(x => x.Trim())) + ")");
+        }
+        else if (Type == GrammarElementType.KeyValue)
+        {
+            if (Data is not List<GrammarKeyValueChoice> choices)
+            {
+                throw new InvalidOperationException("Data must be a list of GrammarKeyValueChoices.");
+            }
+
+            toReturn.Add($"<{Key}>");
+        }
+        else if (Type == GrammarElementType.GrammarElementList)
+        {
+            if (Data is not List<GrammarElement> elements)
+            {
+                throw new InvalidOperationException("Data must be a list of GrammarElements.");
+            }
+
+            foreach (var element in elements)
+            {
+                toReturn.AddRange(element.GetHelpText());
+            }
+        }
+        
+        return toReturn;
+    }
     
     [SupportedOSPlatform("windows")]
     public System.Speech.Recognition.Grammar ToSystemSpeechGrammar()

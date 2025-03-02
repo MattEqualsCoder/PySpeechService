@@ -29,6 +29,7 @@ var builder = new SpeechRecognitionGrammarBuilder("test rule 1");
 builder.Append("Hey Tracker, ")
     .OneOf("how are you?", "fuck you");
 var rule = builder.BuildGrammar();
+var help1 = rule.HelpText.ToList();
 rule.SpeechRecognized += (sender, eventArgs) =>
 {
     Console.WriteLine($"Test rule 1 recognized: {eventArgs.Result.Text} ({eventArgs.Result.Confidence})");
@@ -37,13 +38,17 @@ rules.Add(rule);
 
 builder = new SpeechRecognitionGrammarBuilder("test rule 2");
 builder.Append("Hey Tracker, ")
+    .Optional("can you tell me", "could you kindly tell me")
     .OneOf("where is my cat?", "are you a kitty cat?");
+
 rule = builder.BuildGrammar();
+var help2 = rule.HelpText.ToList();
 rule.SpeechRecognized += (sender, eventArgs) =>
 {
     Console.WriteLine($"Test rule 2 recognized: {eventArgs.Result.Text} ({eventArgs.Result.Confidence})");
 };
 rules.Add(rule);
+
 
 builder = new SpeechRecognitionGrammarBuilder("test rule 3");
 builder.Append("Hey Tracker, please give me")
@@ -51,11 +56,32 @@ builder.Append("Hey Tracker, please give me")
         new GrammarKeyValueChoice("Soup", "soup"),
         new GrammarKeyValueChoice("Pizza", "pizza"),
         new GrammarKeyValueChoice("Bread", "bread"),
+        new GrammarKeyValueChoice("Fruit", "fruit"),
     ]);
 rule = builder.BuildGrammar();
+
+var help3 = rule.HelpText.ToList();
 rule.SpeechRecognized += (sender, eventArgs) =>
 {
     Console.WriteLine($"Test rule 3 recognized: {eventArgs.Result.Text} ({eventArgs.Result.Confidence}) - food: {eventArgs.Result.Semantics["food"].Value}");
+};
+rules.Add(rule);
+
+var builder1 = new SpeechRecognitionGrammarBuilder();
+builder1.Append("Hey Tracker, ")
+    .OneOf("give me", "throw me")
+    .OneOf("a bone", "an item");
+var builder2 = new SpeechRecognitionGrammarBuilder();
+builder2.Append("Hey Tracker, ")
+    .OneOf("take", "steal")
+    .OneOf("a bone", "an item");
+
+builder = SpeechRecognitionGrammarBuilder.Combine(builder1, builder2);
+rule = builder.BuildGrammar("test rule 4");
+var help4 = rule.HelpText.ToList();
+rule.SpeechRecognized += (sender, eventArgs) =>
+{
+    Console.WriteLine($"Test rule 4 recognized: {eventArgs.Result.Text} ({eventArgs.Result.Confidence})");
 };
 rules.Add(rule);
 
@@ -82,11 +108,44 @@ if (OperatingSystem.IsWindows())
 }
 
 var client = serviceProvider.GetRequiredService<IPySpeechService>();
+client.AutoReconnect = true;
 await client.StartAsync();
 foreach (var ruleToAdd in rules)
 {
     client.AddSpeechRecognitionCommand(ruleToAdd);
 }
+
+client.AddSpeechRecognitionReplacements(new Dictionary<string, string>()
+{
+    { "a pineapple", "fruit" },
+    { "an orange", "fruit" },
+});
+
+client.SpeakCommandResponded += async (sender, eventArgs) =>
+{
+    List<string> parts = [];
+    if (eventArgs.Response.IsStartOfMessage)
+    {
+        parts.Add("Message start");
+    }
+
+    if (eventArgs.Response.IsStartOfChunk)
+    {
+        parts.Add($"Chunk ({eventArgs.Response.CurrentChunk}) started");
+    }
+
+    if (eventArgs.Response.IsEndOfChunk)
+    {
+        parts.Add($"Chunk ({eventArgs.Response.CurrentChunk}) ended");
+    }
+
+    if (eventArgs.Response.IsEndOfMessage)
+    {
+        parts.Add("Message end");
+    }
+
+    Console.WriteLine(string.Join(" | ", parts));
+};
 
 while (client.IsConnected)
 {
@@ -134,7 +193,16 @@ while (client.IsConnected)
     }
     else
     {
-        await client.SpeakAsync(message);
+        if (message.StartsWith("sync "))
+        {
+            client.Speak(message);
+            Console.WriteLine("Done");
+        }
+        else
+        {
+            await client.SpeakAsync(message);
+        }
+        
     }
     
 }

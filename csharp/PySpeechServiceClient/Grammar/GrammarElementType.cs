@@ -1,6 +1,6 @@
 ﻿namespace PySpeechServiceClient.Grammar;
 
-public enum GrammarElementType
+internal enum GrammarElementType
 {
     Rule,
     String,

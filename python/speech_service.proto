@@ -12,6 +12,7 @@ message SpeechServiceRequest {
     StopSpeakingRequest stop_speaking = 4;
     ShutdownRequest shutdown = 5;
     PingRequest ping = 6;
+    StopSpeechRecognitionRequest stop_speech_recognition = 7;
   }
 }
 
@@ -36,6 +37,8 @@ message StartSpeechRecognitionRequest {
   string grammar_file = 2;
   double required_confidence = 3;
 }
+
+message StopSpeechRecognitionRequest {}
 
 message SetSpeechSettingsRequest {
   SpeechSettings speech_settings = 1;
@@ -68,6 +71,7 @@ message SpeakUpdateResponse {
   bool is_start_of_chunk = 4;
   bool is_end_of_message = 5;
   bool is_end_of_chunk = 6;
+  bool has_another_request = 7;
 }
 
 message SpeechRecognitionResponse {
