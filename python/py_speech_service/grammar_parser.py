@@ -22,6 +22,8 @@ class GrammarParser:
     phrase_replacement_regex: str
     replacement_map: dict[str, str]
     replacement_regex: str
+    has_replacements: bool = False
+    prefix: list[str]
 
     def set_grammar_file(self, file_path: str):
         with open(file_path, 'r') as fp:
@@ -29,35 +31,43 @@ class GrammarParser:
 
         self.all_words = []
         self.replacement_map = {}
+        self.replacement_regex = ""
         self.phrase_replacement_map = {}
+        self.phrase_replacement_regex = ""
 
         json_data = json.loads(lines)
 
         logging.info("Loaded grammar json data file " + file_path)
 
-        for find_text, replace_with in json_data["Replacements"].items():
-            find_text_str = str(find_text).lower()
-            replace_with_str = str(replace_with).lower()
-            self.replacement_map[find_text_str] = replace_with_str
-            self.all_words.append(find_text_str)
+        if "Replacements" in json_data:
+            for find_text, replace_with in json_data["Replacements"].items():
+                find_text_str = str(find_text).lower()
+                replace_with_str = str(replace_with).lower()
+                self.replacement_map[find_text_str] = replace_with_str
+                self.all_words.append(find_text_str)
 
-            if not self.phrase_replacement_map.__contains__(replace_with_str):
-                self.phrase_replacement_map[replace_with_str] = []
-            self.phrase_replacement_map[replace_with_str].append(find_text_str)
+                if not self.phrase_replacement_map.__contains__(replace_with_str):
+                    self.phrase_replacement_map[replace_with_str] = []
+                self.phrase_replacement_map[replace_with_str].append(find_text_str)
 
-        logging.info("Loaded " + str(len(json_data["Replacements"])) + " replacements")
+            logging.info("Loaded " + str(len(json_data["Replacements"])) + " replacements")
 
-        sorted_replacement_keys = sorted(self.replacement_map.keys(), key=len, reverse=True)
-        self.replacement_regex = r'(' + '|'.join(map(re.escape, sorted_replacement_keys)) + r')'
+            sorted_replacement_keys = sorted(self.replacement_map.keys(), key=len, reverse=True)
+            self.replacement_regex = r'(' + '|'.join(map(re.escape, sorted_replacement_keys)) + r')'
 
-        sorted_replacement_keys = sorted(self.phrase_replacement_map.keys(), key=len, reverse=True)
-        self.phrase_replacement_regex = r'\b(' + '|'.join(map(re.escape, sorted_replacement_keys)) + r')\b'
+            sorted_replacement_keys = sorted(self.phrase_replacement_map.keys(), key=len, reverse=True)
+            self.phrase_replacement_regex = r'\b(' + '|'.join(map(re.escape, sorted_replacement_keys)) + r')\b'
 
         for rule in json_data["Rules"]:
             rule_name: str = rule["Key"]
             self.__parse_rule_element(rule_name, rule)
 
         logging.info("Loaded " + str(len(json_data["Rules"])) + " rules")
+
+        if "Prefix" in json_data:
+            self.prefix = json_data["Prefix"].lower().split()
+        else:
+            self.prefix = []
 
         self.all_words = list(set(self.all_words))
         updated_words = []
@@ -72,19 +82,20 @@ class GrammarParser:
         if search_word_count > 30:
             return None
 
-        prefix_search = " ".join(search_words[:2])
-        prefix_result = self.__find_closest_sentence(["hey tracker"], prefix_search)
-        if prefix_result is None:
-            return None
-        if prefix_result[1] < min_prefix_threshold:
-            return None
-        prefix_confidence = prefix_result[1]
-        search_words[0] = "hey"
-        search_words[1] = "tracker"
-        search_text = " ".join(search_words)
+        if len(self.prefix) > 0:
+            prefix_search = " ".join(search_words[:len(self.prefix)])
+            prefix_result = self.__find_closest_sentence([" ".join(self.prefix)], prefix_search)
+            if prefix_result is None:
+                return None
+            if prefix_result[1] < min_prefix_threshold:
+                return None
+            index = 0
+            for word in self.prefix:
+                search_words[index] = word
+                index = index + 1
+            search_text = " ".join(search_words)
+            logging.info("Matched prefix " + " ".join(self.prefix))
 
-        highest_confidence: float = 0
-        highest_match: typing.Optional[GrammarElementLookupItem] = None
         possibilities: [(str, float)] = []
         for i in range(search_word_count, 1, -1):
             search_phrase = " ".join(search_words[0:i])
@@ -126,8 +137,9 @@ class GrammarParser:
             if selected_match.confidence > 98:
                 selected_match.confidence = selected_match.confidence - random.uniform(0.5, 2.5)
 
-            selected_match.matched_text = re.sub(self.replacement_regex, lambda regex_match: self.replacement_map[regex_match.group(0)],
-                                 selected_match.matched_text)
+            if self.replacement_regex:
+                selected_match.matched_text = re.sub(self.replacement_regex, lambda regex_match: self.replacement_map[regex_match.group(0)],
+                                     selected_match.matched_text)
 
             return selected_match
 
@@ -171,13 +183,17 @@ class GrammarParser:
                         key = num2words.num2words(key).replace("-", " ")
                     key = str(key).lower()
 
-                    match = re.search(self.phrase_replacement_regex, key)
-                    if match:
-                        replacements = self.phrase_replacement_map[match.group()]
-                        for replacement in replacements:
-                            new_key = str(key).replace(match.group(), replacement)
-                            items.append({ "Key": new_key, "Value" : key_value_json['Value']})
-                            words.append(new_key)
+                    if self.phrase_replacement_regex:
+                        match = re.search(self.phrase_replacement_regex, key)
+                        if match:
+                            replacements = self.phrase_replacement_map[match.group()]
+                            for replacement in replacements:
+                                new_key = str(key).replace(match.group(), replacement)
+                                items.append({ "Key": new_key, "Value" : key_value_json['Value']})
+                                words.append(new_key)
+                        else:
+                            items.append(key_value_json)
+                            words.append(key)
                     else:
                         items.append(key_value_json)
                         words.append(key)

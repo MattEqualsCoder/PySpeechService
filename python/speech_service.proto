@@ -42,7 +42,6 @@ message StopSpeechRecognitionRequest {}
 
 message SetSpeechSettingsRequest {
   SpeechSettings speech_settings = 1;
-  optional SpeechSettings alt_voice_settings = 2;
 }
 
 message SpeechSettings {

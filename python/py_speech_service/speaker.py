@@ -394,6 +394,8 @@ class Speaker:
                 os.remove(f)
 
     async def __handle_play(self, request: PendingSpeechRequest):
+        if self.stop_talking_event.is_set():
+            return
         self.is_speaking = True
         if hasattr(request, "message") and request.message:
             logging.debug("Playing " + request.message)
@@ -431,7 +433,6 @@ class Speaker:
                 stream.stop_stream()
                 stream.close()
                 p.terminate()
-                self.stop_talking_event.clear()
                 self.is_speaking = False
                 logging.info("Finished saying \"" + request.message + "\"")
 

@@ -116,8 +116,9 @@ public interface IPySpeechService : IDisposable
     /// </summary>
     /// <param name="voskModel">The VOSK voice recognition model to use. en-us small is used if not procided.</param>
     /// <param name="requiredConfidence">The required confidence for matching the text spoken</param>
+    /// <param name="prefix">Prefix for all speech recognition statements</param>
     /// <returns>True if the request was successfully sent to the PySpeechService application</returns>
-    public Task<bool> StartSpeechRecognitionAsync(string? voskModel = null, double requiredConfidence = 80);
+    public Task<bool> StartSpeechRecognitionAsync(string? voskModel = null, double requiredConfidence = 80, string prefix = "");
     
     /// <summary>
     /// Stops the PySpeechService application from listening for speech

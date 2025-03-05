@@ -3,7 +3,6 @@
 using System.Speech.Recognition;
 using Microsoft.Extensions.DependencyInjection;
 using Microsoft.Extensions.Logging;
-using Newtonsoft.Json;
 using PySpeechServiceClient;
 using PySpeechServiceClient.Grammar;
 using PySpeechServiceClient.Models;
@@ -26,7 +25,7 @@ var serviceProvider = new ServiceCollection()
 List<SpeechRecognitionGrammar> rules = [];
 
 var builder = new SpeechRecognitionGrammarBuilder("test rule 1");
-builder.Append("Hey Tracker, ")
+builder.Append("Hey computer, ")
     .OneOf("how are you?", "fuck you");
 var rule = builder.BuildGrammar();
 var help1 = rule.HelpText.ToList();
@@ -37,7 +36,7 @@ rule.SpeechRecognized += (sender, eventArgs) =>
 rules.Add(rule);
 
 builder = new SpeechRecognitionGrammarBuilder("test rule 2");
-builder.Append("Hey Tracker, ")
+builder.Append("Hey computer, ")
     .Optional("can you tell me", "could you kindly tell me")
     .OneOf("where is my cat?", "are you a kitty cat?");
 
@@ -51,7 +50,7 @@ rules.Add(rule);
 
 
 builder = new SpeechRecognitionGrammarBuilder("test rule 3");
-builder.Append("Hey Tracker, please give me")
+builder.Append("Hey computer, please give me")
     .Append("food", [
         new GrammarKeyValueChoice("Soup", "soup"),
         new GrammarKeyValueChoice("Pizza", "pizza"),
@@ -68,11 +67,11 @@ rule.SpeechRecognized += (sender, eventArgs) =>
 rules.Add(rule);
 
 var builder1 = new SpeechRecognitionGrammarBuilder();
-builder1.Append("Hey Tracker, ")
+builder1.Append("Hey computer, ")
     .OneOf("give me", "throw me")
     .OneOf("a bone", "an item");
 var builder2 = new SpeechRecognitionGrammarBuilder();
-builder2.Append("Hey Tracker, ")
+builder2.Append("Hey computer, ")
     .OneOf("take", "steal")
     .OneOf("a bone", "an item");
 
@@ -163,7 +162,7 @@ while (client.IsConnected)
     }
     else if ("start speech recognition".Equals(message, StringComparison.OrdinalIgnoreCase))
     {
-        await client.StartSpeechRecognitionAsync();
+        await client.StartSpeechRecognitionAsync(prefix: "Hey Computer");
     }
     else if ("set defaults".Equals(message, StringComparison.OrdinalIgnoreCase))
     {

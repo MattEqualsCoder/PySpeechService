@@ -153,13 +153,14 @@ internal class PySpeechService(PySpeechServiceRunner runner, IServiceProvider se
         }));
     }
 
-    public async Task<bool> StartSpeechRecognitionAsync(string? voskModel = null, double requiredConfidence = 80)
+    public async Task<bool> StartSpeechRecognitionAsync(string? voskModel = null, double requiredConfidence = 80, string prefix = "")
     {
         var rules = _commands.Values.Select(x => x.RuleGrammarElement).ToList();
         var toJsonObject = new Dictionary<string, object>()
         {
             { "Rules", rules },
-            { "Replacements", _replacements ?? new Dictionary<string, string>() }
+            { "Replacements", _replacements ?? new Dictionary<string, string>() },
+            { "Prefix", prefix }
         };
         var tempFile = Path.GetTempPath() + Guid.NewGuid() + ".json";
         var json = JsonConvert.SerializeObject(toJsonObject);

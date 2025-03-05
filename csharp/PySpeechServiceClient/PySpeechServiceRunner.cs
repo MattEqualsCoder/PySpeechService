@@ -24,7 +24,7 @@ internal class DebugJsonFileData
 
 internal class PySpeechServiceRunner(IServiceProvider serviceProvider) : IDisposable
 {
-    public static readonly string RequiredPySpeechServiceVersion = "0.0.4";
+    public static readonly string RequiredPySpeechServiceVersion = "0.0.8";
     
     private readonly ILogger<PySpeechServiceRunner>? _logger = serviceProvider.GetService<ILogger<PySpeechServiceRunner>>();
     private string? _previousOutput;
@@ -165,7 +165,7 @@ internal class PySpeechServiceRunner(IServiceProvider serviceProvider) : IDispos
             var requiredVersion = VersionStringToInt(RequiredPySpeechServiceVersion)!;
             var version = VersionStringToInt(response.Version);
 
-            if (version > requiredVersion)
+            if (version >= requiredVersion)
             {
                 _logger?.LogInformation("PySpeechService {Version} started on port {Port}", $"v{response.Version}", response.Port);
                 Port = response.Port;
