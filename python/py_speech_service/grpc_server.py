@@ -4,6 +4,7 @@ import json
 import logging
 import sys
 import time
+import traceback
 from asyncio import Server, Queue
 from cgi import print_exception
 
@@ -106,7 +107,7 @@ class GrpcServer:
 
                     if self.speech_initialized:
                         speech_settings = SpeechSettings(request.speak.speech_settings) if request.speak.HasField("speech_settings") else None
-                        await self.speaker.speak(request.speak.message, speech_settings)
+                        await self.speaker.speak(request.speak.message, speech_settings, request.speak.message_id)
                     else:
                         response = speech_service_pb2.SpeechServiceResponse()
                         response.error.error_message = "Speech settings have not been initialized. Call set_speech_settings first."
@@ -133,14 +134,20 @@ class GrpcServer:
                 elif request.HasField("stop_speech_recognition"):
                     print("Received stop speech recognition request")
                     self.speech_recognition.stop_speech_recognition()
+                elif request.HasField("set_volume"):
+                    logging.info("Received set volume request")
+                    self.speaker.set_volume(request.set_volume.volume)
+                    response = speech_service_pb2.SpeechServiceResponse()
+                    response.set_volume.successful = True
+                    await self.response_queue.put(response)
 
             except Exception as e:
-                logging.error("Exception starting speech service: " + str(e))
+                logging.error("Exception with speech service: " + str(e))
                 logging.error(repr(e))
                 logging.error(traceback.format_exc())
                 print_exception(value = e)
                 response = speech_service_pb2.SpeechServiceResponse()
-                response.error.error_message = "Exception starting speech service"
+                response.error.error_message = "Exception with speech service: " + str(e)
                 response.error.exception = repr(e)
                 await self.response_queue.put(response)
 

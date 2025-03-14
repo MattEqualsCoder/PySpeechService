@@ -24,7 +24,7 @@ internal class DebugJsonFileData
 
 internal class PySpeechServiceRunner(IServiceProvider serviceProvider) : IDisposable
 {
-    public static readonly string RequiredPySpeechServiceVersion = "0.0.8";
+    public static readonly string RequiredPySpeechServiceVersion = "0.0.10";
     
     private readonly ILogger<PySpeechServiceRunner>? _logger = serviceProvider.GetService<ILogger<PySpeechServiceRunner>>();
     private string? _previousOutput;

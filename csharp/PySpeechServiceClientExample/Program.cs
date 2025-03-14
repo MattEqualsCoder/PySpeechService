@@ -164,6 +164,13 @@ while (client.IsConnected)
     {
         await client.StartSpeechRecognitionAsync(prefix: "Hey Computer");
     }
+    else if (message.StartsWith("set volume "))
+    {
+        if (double.TryParse(message.Replace("set volume ", ""), out var volume))
+        {
+            await client.SetVolumeAsync(volume);
+        }
+    }
     else if ("set defaults".Equals(message, StringComparison.OrdinalIgnoreCase))
     {
         Console.Write("Enter the model name: ");

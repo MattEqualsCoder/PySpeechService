@@ -16,8 +16,9 @@ internal class PySpeechService(PySpeechServiceRunner runner, IServiceProvider se
     private readonly ILogger<PySpeechService>? _logger = serviceProvider.GetService<ILogger<PySpeechService>>();
     private readonly Dictionary<string, SpeechRecognitionGrammar> _commands = [];
     private readonly SemaphoreSlim _requestSemaphore = new(0);
-    private readonly ConcurrentDictionary<string, TaskCompletionSource> _taskCompletionSources = [];
+    private readonly ConcurrentDictionary<ulong, TaskCompletionSource> _taskCompletionSources = [];
     private readonly ConcurrentQueue<SpeechServiceRequest> _requests = new();
+    private readonly ConcurrentQueue<ulong> _pendingMessageIds = [];
     private GrpcChannel? _channel;
     private CancellationTokenSource? _cts;
     private AsyncDuplexStreamingCall<SpeechServiceRequest, SpeechServiceResponse>? _speechGrpcService;
@@ -30,6 +31,7 @@ internal class PySpeechService(PySpeechServiceRunner runner, IServiceProvider se
     private bool _hasSentStoppedEvent;
     private bool _hasPerformedFirstInit;
     private IDictionary<string, string>? _replacements;
+    private ulong _currentId;
 
     public bool IsConnected { get; private set; }
     
@@ -107,29 +109,50 @@ internal class PySpeechService(PySpeechServiceRunner runner, IServiceProvider se
 
     public void Speak(string message, Models.SpeechSettings? details = null)
     {
+        if (string.IsNullOrEmpty(message))
+        {
+            return;
+        }
+        
         var source = new TaskCompletionSource();
-        _taskCompletionSources.TryAdd(message, source);
-        _ = SpeakAsync(message, details);
+        _currentId++;
+        
+        var id = _currentId;
+        _taskCompletionSources.TryAdd(id, source);
+        _pendingMessageIds.Enqueue(id);
+        
+        _ = SendSpeakRequest(message, details, id);
+        
         source.Task.GetAwaiter().GetResult();
-        _taskCompletionSources.TryRemove(message, out _);
+        
+        _taskCompletionSources.TryRemove(id, out _);
+        while (_pendingMessageIds.TryPeek(out var otherId) && otherId <= id)
+        {
+            if (_pendingMessageIds.TryDequeue(out otherId))
+            {
+                if (otherId != id && _taskCompletionSources.TryGetValue(otherId, out var otherTcs))
+                {
+                    try
+                    {
+                        otherTcs.TrySetResult();
+                    }
+                    catch (Exception)
+                    {
+                        // do nothing
+                    }
+                }
+            }
+        }
     }
     
     public Task<bool> SpeakAsync(string message, Models.SpeechSettings? details = null)
     {
-        if (!_isSpeechSetup)
+        if (string.IsNullOrEmpty(message))
         {
-            _logger?.LogWarning("PySpeechService Speech Settings are not setup. Please call SetSpeechSettingsAsync.");
             return Task.FromResult(false);
         }
         
-        return Task.FromResult(SendSpeechServiceRequest(new SpeechServiceRequest()
-        {
-            Speak = new SpeakRequest()
-            {
-                Message = message,
-                SpeechSettings = details?.ToSpeechSettings()
-            }
-        }));
+        return SendSpeakRequest(message, details);
     }
 
     public Task<bool> StopSpeakingAsync()
@@ -208,7 +231,20 @@ internal class PySpeechService(PySpeechServiceRunner runner, IServiceProvider se
 
         return true;
     }
-    
+
+    public Task<bool> SetVolumeAsync(double volume)
+    {
+        var result = SendSpeechServiceRequest(new SpeechServiceRequest()
+        {
+            SetVolume = new SetSpeechVolumeRequest()
+            {
+                Volume = volume
+            }
+        });
+
+        return Task.FromResult(result);
+    }
+
     public void Dispose()
     {
         _ = CleanupAsync();
@@ -218,6 +254,28 @@ internal class PySpeechService(PySpeechServiceRunner runner, IServiceProvider se
         GC.SuppressFinalize(this);
     }
 
+    private Task<bool> SendSpeakRequest(string message, Models.SpeechSettings? details = null, ulong? id = null)
+    {
+        if (!_isSpeechSetup)
+        {
+            _logger?.LogWarning("PySpeechService Speech Settings are not setup. Please call SetSpeechSettingsAsync.");
+            return Task.FromResult(false);
+        }
+
+        id ??= _currentId + 1;
+        _currentId = id.Value;
+        
+        return Task.FromResult(SendSpeechServiceRequest(new SpeechServiceRequest()
+        {
+            Speak = new SpeakRequest()
+            {
+                Message = message,
+                SpeechSettings = details?.ToSpeechSettings(),
+                MessageId = _currentId
+            }
+        }));
+    }
+    
     private async Task SendRequests()
     {
         if (_speechGrpcService == null)
@@ -269,9 +327,26 @@ internal class PySpeechService(PySpeechServiceRunner runner, IServiceProvider se
                 if (response.SpeakUpdate != null)
                 {
                     if (response.SpeakUpdate.IsEndOfMessage &&
-                        _taskCompletionSources.TryGetValue(response.SpeakUpdate.Message, out var tcs))
+                        _taskCompletionSources.TryGetValue(response.SpeakUpdate.MessageId, out var tcs))
                     {
-                        tcs.SetResult();
+                        tcs.TrySetResult();
+                    }
+                    else if (_pendingMessageIds.TryPeek(out var pendingMessageId) && response.SpeakUpdate.MessageId > pendingMessageId)
+                    {
+                        for (var i = pendingMessageId; i < response.SpeakUpdate.MessageId; i++)
+                        {
+                            if (_taskCompletionSources.TryGetValue(i, out var iTcs))
+                            {
+                                try
+                                {
+                                    iTcs.TrySetResult();
+                                }
+                                catch (Exception)
+                                {
+                                    // do nothing
+                                }
+                            }
+                        }
                     }
                     
                     SpeakCommandResponded?.Invoke(this, new SpeakCommandResponseEventArgs(new SpeakCommandResponse()
@@ -348,6 +423,10 @@ internal class PySpeechService(PySpeechServiceRunner runner, IServiceProvider se
                 else if (response.Error != null)
                 {
                     _logger?.LogError("Error received from PySpeechService: {Error}", response.Error);
+                }
+                else if (response.SetVolume != null)
+                {
+                    _logger?.LogInformation("Volume set {Value}", response.SetVolume.Successful ? "successfully" : "failed");
                 }
                 else if (response.Ping == null)
                 {

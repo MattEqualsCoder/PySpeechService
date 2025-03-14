@@ -13,6 +13,7 @@ message SpeechServiceRequest {
     ShutdownRequest shutdown = 5;
     PingRequest ping = 6;
     StopSpeechRecognitionRequest stop_speech_recognition = 7;
+    SetSpeechVolumeRequest set_volume = 8;
   }
 }
 
@@ -24,6 +25,7 @@ message SpeechServiceResponse {
     PingResponse ping = 4;
     StartSpeechRecognitionResponse speech_recognition_started = 5;
     SetSpeechSettingsResponse speech_settings_set = 6;
+    SetSpeechVolumeResponse set_volume = 7;
   }
 }
 
@@ -59,6 +61,7 @@ message SpeechSettings {
 message SpeakRequest {
   string message = 1;
   optional SpeechSettings speech_settings = 2;
+  uint64 message_id = 3;
 }
 
 message StopSpeakingRequest {}
@@ -71,6 +74,7 @@ message SpeakUpdateResponse {
   bool is_end_of_message = 5;
   bool is_end_of_chunk = 6;
   bool has_another_request = 7;
+  uint64 message_id = 8;
 }
 
 message SpeechRecognitionResponse {
@@ -96,5 +100,13 @@ message StartSpeechRecognitionResponse {
 }
 
 message SetSpeechSettingsResponse {
+  bool successful = 1;
+}
+
+message SetSpeechVolumeRequest {
+  double volume = 1;
+}
+
+message SetSpeechVolumeResponse {
   bool successful = 1;
 }

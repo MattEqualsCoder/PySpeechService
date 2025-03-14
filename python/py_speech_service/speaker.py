@@ -4,6 +4,7 @@ import logging
 import os
 import re
 import tempfile
+import traceback
 import typing
 from pathlib import Path
 
@@ -11,7 +12,7 @@ import numpy
 import pyaudio
 from pydub import AudioSegment
 from pydub.silence import detect_leading_silence
-from pydub.utils import make_chunks
+from pydub.utils import make_chunks, ratio_to_db
 from yapper.utils import get_random_name
 
 from py_speech_service import speech_service_pb2
@@ -65,6 +66,7 @@ class PendingSpeechRequest:
     first_request_of_message: bool
     last_request_of_message: bool
     file_path: str
+    message_id: int
 
     def __init__(self):
         self.file_path = os.path.join(tempfile.gettempdir(), "py_speech_service", get_random_name(20) + ".wav")
@@ -95,6 +97,7 @@ class Speaker:
     piper: typing.Optional[Piper] = None
     is_done = False
     is_speaking = False
+    volume: float = 1
 
     def start(self):
         folder = os.path.join(tempfile.gettempdir(), "py_speech_service")
@@ -164,7 +167,7 @@ class Speaker:
         words = paragraph.split()  # Split by spaces
         return [' '.join(words[i:i + words_per_line]) for i in range(0, len(words), words_per_line)]
 
-    async def speak(self, message: str, settings: typing.Optional[SpeechSettings] = None):
+    async def speak(self, message: str, settings: typing.Optional[SpeechSettings] = None, message_id: int = 0):
 
         self.stop_talking_event.clear()
 
@@ -178,6 +181,7 @@ class Speaker:
                     request.speech_settings = SpeechSettings(settings)
                 request.message = line
                 request.original_message = message
+                request.message_id = message_id
                 request.first_request_of_message = line == lines[0]
                 request.last_request_of_message = line == lines[len(lines)-1]
 
@@ -216,6 +220,7 @@ class Speaker:
                 request.first_request_of_message = is_first
                 request.last_request_of_message = request == last_request
                 request.original_message = message
+                request.message_id = message_id
 
                 is_first = False
                 await self.process_queue.put(request)
@@ -239,6 +244,9 @@ class Speaker:
 
     def shutdown(self):
         self.shutdown_event.set()
+
+    def set_volume(self, volume: float):
+        self.volume = volume
 
     @staticmethod
     def __split_by_tags(html: str) -> list[str]:
@@ -369,6 +377,7 @@ class Speaker:
             response.speak_update.is_end_of_message = not is_start and (request.last_request_of_message or self.stop_talking_event.is_set())
             response.speak_update.is_end_of_chunk = not is_start
             response.speak_update.has_another_request = not self.process_queue.empty() or not self.play_queue.empty()
+            response.speak_update.message_id = request.message_id
             await self.grpc_response_queue.put(response)
 
     def __update_piper(self, request: PendingSpeechRequest) -> SpeechSettings:
@@ -417,6 +426,9 @@ class Speaker:
 
             new_frame_rate = int(sound.frame_rate * frame_rate_modifier)
             sound = sound._spawn(sound.raw_data, overrides={"frame_rate": new_frame_rate})
+
+            if self.volume != 1:
+                sound = sound.apply_gain(ratio_to_db(self.volume))
 
             p = pyaudio.PyAudio()
             stream = p.open(format=p.get_format_from_width(sound.sample_width),

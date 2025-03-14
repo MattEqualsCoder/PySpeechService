@@ -131,4 +131,11 @@ public interface IPySpeechService : IDisposable
     /// </summary>
     /// <returns>True if the request was successfully sent to the PySpeechService application</returns>
     public Task<bool> ShutdownAsync();
+
+    /// <summary>
+    /// Sets the default volume for text to speech
+    /// </summary>
+    /// <param name="volume">The volume ratio with 0 being silent, 1 being default, and 2 being twice as loud</param>
+    /// <returns>True if the request was successfully sent to the PySpeechService application</returns>
+    public Task<bool> SetVolumeAsync(double volume);
 }
