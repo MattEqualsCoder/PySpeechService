@@ -10,7 +10,7 @@ from pathlib import Path
 from platformdirs import user_data_dir
 
 from py_speech_service.grpc_server import GrpcServer
-from py_speech_service.speaker import Speaker
+from py_speech_service.speaker import Speaker, SpeechSettings
 from py_speech_service.speech_recognition import SpeechRecognition
 from py_speech_service.version import Version
 
@@ -44,6 +44,7 @@ def cli():
             logging.info("Starting speak mode")
             speech = arg_array.pop()
             speaker = Speaker()
+            speaker.init_speech_settings(SpeechSettings())
             asyncio.run(speaker.speak_basic_line(speech))
         elif first_arg == "recognition" or second_arg == "recognition":
             logging.info("Starting speech recognition mode")

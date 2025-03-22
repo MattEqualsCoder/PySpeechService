@@ -14,8 +14,8 @@ public static class PySpeechServiceExtensions
     /// <returns>The provided service collection</returns>
     public static IServiceCollection AddPySpeechService(this IServiceCollection services)
     {
-        services.AddSingleton<IPySpeechService, PySpeechService>();
-        services.AddSingleton<PySpeechServiceRunner>();
+        services.AddSingleton<IPySpeechServiceFactory, PySpeechServiceFactory>();
+        services.AddSingleton<IPySpeechService>(provider => provider.GetRequiredService<IPySpeechServiceFactory>().GetService());
         return services;
     }
 }

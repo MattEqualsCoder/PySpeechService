@@ -128,7 +128,8 @@ class Speaker:
         self.speech_settings = settings
         response = speech_service_pb2.SpeechServiceResponse()
         response.speech_settings_set.successful = True
-        asyncio.create_task(self.grpc_response_queue.put(response))
+        if self.grpc_response_queue:
+            asyncio.create_task(self.grpc_response_queue.put(response))
 
     async def handle_process_queue(self):
         logging.info("Started handling process queue")

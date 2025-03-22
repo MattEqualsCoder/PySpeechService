@@ -51,7 +51,7 @@ public interface IPySpeechService : IDisposable
     /// Event for when speech recognition has finised initializing, including
     /// after downloading the vosk files
     /// </summary>
-    public event EventHandler SpeechRecognitionInitialized;
+    public event EventHandler<SpeechRecognitionInitializedEventArgs> SpeechRecognitionInitialized;
     
     /// <summary>
     /// Event for when the PySpeechService's TTS has either started or stopped

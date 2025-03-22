@@ -39,7 +39,7 @@ class GrammarParser:
 
         logging.info("Loaded grammar json data file " + file_path)
 
-        if "Replacements" in json_data:
+        if "Replacements" in json_data and json_data["Replacements"] and len(json_data["Replacements"]) > 0:
             for find_text, replace_with in json_data["Replacements"].items():
                 find_text_str = str(find_text).lower()
                 replace_with_str = str(replace_with).lower()

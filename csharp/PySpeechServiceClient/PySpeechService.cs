@@ -10,10 +10,10 @@ using JsonSerializer = System.Text.Json.JsonSerializer;
 
 namespace PySpeechServiceClient;
 
-internal class PySpeechService(PySpeechServiceRunner runner, IServiceProvider serviceProvider)
+internal class PySpeechService(PySpeechServiceRunner runner)
     : IPySpeechService
 {
-    private readonly ILogger<PySpeechService>? _logger = serviceProvider.GetService<ILogger<PySpeechService>>();
+    internal ILogger<IPySpeechService>? Logger;
     private readonly Dictionary<string, SpeechRecognitionGrammar> _commands = [];
     private readonly SemaphoreSlim _requestSemaphore = new(0);
     private readonly ConcurrentDictionary<ulong, TaskCompletionSource> _taskCompletionSources = [];
@@ -44,7 +44,7 @@ internal class PySpeechService(PySpeechServiceRunner runner, IServiceProvider se
     public event EventHandler? Initialized;
     public event EventHandler? Disconnected;
     public event EventHandler? TextToSpeechInitialized;
-    public event EventHandler? SpeechRecognitionInitialized;
+    public event EventHandler<SpeechRecognitionInitializedEventArgs>? SpeechRecognitionInitialized;
     public event EventHandler<SpeakCommandResponseEventArgs>? SpeakCommandResponded;
     public event EventHandler<SpeechRecognitionResultEventArgs>? SpeechRecognized;
 
@@ -64,23 +64,23 @@ internal class PySpeechService(PySpeechServiceRunner runner, IServiceProvider se
         // Attempt to start the service 3 times
         for (var i = 0; i < 3; i++)
         {
-            _logger?.LogInformation("PySpeechService Initialization Attempt {Number}", i + 1);
+            Logger?.LogInformation("PySpeechService Initialization Attempt {Number}", i + 1);
 
             try
             {
                 var response = await InitAttempt();
                 if (response)
                 {
-                    _logger?.LogInformation("PySpeechService initialization successful");
+                    Logger?.LogInformation("PySpeechService initialization successful");
                     Initialized?.Invoke(this, EventArgs.Empty);
                     return true;
                 }
 
-                _logger?.LogError("PySpeechService initialization failed");
+                Logger?.LogError("PySpeechService initialization failed");
             }
             catch (Exception e)
             {
-                _logger?.LogError(e, "PySpeechService initialization failed");
+                Logger?.LogError(e, "PySpeechService initialization failed");
             }
 
             if (i < 2)
@@ -191,15 +191,15 @@ internal class PySpeechService(PySpeechServiceRunner runner, IServiceProvider se
         try
         {
             await File.WriteAllTextAsync(tempFile, json);
-            _logger?.LogInformation("Writing PySpeechService grammar file to {Path}", tempFile);
+            Logger?.LogInformation("Writing PySpeechService grammar file to {Path}", tempFile);
         }
         catch (Exception e)
         {
-            _logger?.LogError(e, "Unable to write PySpeechService grammar file");
+            Logger?.LogError(e, "Unable to write PySpeechService grammar file");
             return false;
         }
         
-        _logger?.LogInformation("Attempting to start speech recognition");
+        Logger?.LogInformation("Attempting to start speech recognition");
         return SendSpeechServiceRequest(new SpeechServiceRequest
         {
             StartSpeechRecognition = new StartSpeechRecognitionRequest
@@ -258,7 +258,7 @@ internal class PySpeechService(PySpeechServiceRunner runner, IServiceProvider se
     {
         if (!_isSpeechSetup)
         {
-            _logger?.LogWarning("PySpeechService Speech Settings are not setup. Please call SetSpeechSettingsAsync.");
+            Logger?.LogWarning("PySpeechService Speech Settings are not setup. Please call SetSpeechSettingsAsync.");
             return Task.FromResult(false);
         }
 
@@ -298,7 +298,7 @@ internal class PySpeechService(PySpeechServiceRunner runner, IServiceProvider se
                     }
                     catch (Exception e)
                     {
-                        _logger?.LogError(e, "Failed to make PySpeechService call {Call}",
+                        Logger?.LogError(e, "Failed to make PySpeechService call {Call}",
                             JsonSerializer.Serialize(request));
                     }
                 }
@@ -306,7 +306,7 @@ internal class PySpeechService(PySpeechServiceRunner runner, IServiceProvider se
         }
         catch (Exception e)
         {
-            _logger?.LogError(e, "Failed to write gRPC service");
+            Logger?.LogError(e, "Failed to write gRPC service");
         }
             
     }
@@ -385,7 +385,7 @@ internal class PySpeechService(PySpeechServiceRunner runner, IServiceProvider se
                         }
                         catch (Exception e)
                         {
-                            _logger?.LogError(e, "Error handling recognized speech");
+                            Logger?.LogError(e, "Error handling recognized speech");
                         }
                         
                     });
@@ -397,13 +397,17 @@ internal class PySpeechService(PySpeechServiceRunner runner, IServiceProvider se
                     
                     if (response.SpeechRecognitionStarted.Successful)
                     {
-                        _logger?.LogInformation("Speech recognition initialization successful");
-                        _logger?.LogWarning("Speech recognition ignored words: {Words}", string.Join(',', runner.IgnoredWords));
-                        SpeechRecognitionInitialized?.Invoke(this, EventArgs.Empty);
+                        Logger?.LogInformation("Speech recognition initialization successful");
+                        var invalidWords = runner.IgnoredWords.Distinct().ToList();
+                        Logger?.LogWarning("Speech recognition ignored words: {Words}", string.Join(',', invalidWords));
+                        SpeechRecognitionInitialized?.Invoke(this, new SpeechRecognitionInitializedEventArgs
+                        {
+                            InvalidSpeechRecognitionWords = invalidWords
+                        });
                     }
                     else
                     {
-                        _logger?.LogError("Speech recognition initialization failed");
+                        Logger?.LogError("Speech recognition initialization failed");
                     }
                 }
                 else if (response.SpeechSettingsSet != null)
@@ -412,31 +416,31 @@ internal class PySpeechService(PySpeechServiceRunner runner, IServiceProvider se
                     
                     if (response.SpeechSettingsSet.Successful)
                     {
-                        _logger?.LogInformation("Text to speech initialization successful");
+                        Logger?.LogInformation("Text to speech initialization successful");
                         TextToSpeechInitialized?.Invoke(this, EventArgs.Empty);
                     }
                     else
                     {
-                        _logger?.LogError("Text to speech initialization successful");
+                        Logger?.LogError("Text to speech initialization successful");
                     }
                 }
                 else if (response.Error != null)
                 {
-                    _logger?.LogError("Error received from PySpeechService: {Error}", response.Error);
+                    Logger?.LogError("Error received from PySpeechService: {Error}", response.Error);
                 }
                 else if (response.SetVolume != null)
                 {
-                    _logger?.LogInformation("Volume set {Value}", response.SetVolume.Successful ? "successfully" : "failed");
+                    Logger?.LogInformation("Volume set {Value}", response.SetVolume.Successful ? "successfully" : "failed");
                 }
                 else if (response.Ping == null)
                 {
-                    _logger?.LogWarning("Unknown response from PySpeechService: " + JsonSerializer.Serialize(response));
+                    Logger?.LogWarning("Unknown response from PySpeechService: " + JsonSerializer.Serialize(response));
                 }
             }
         }
         catch (RpcException ex)
         {
-            _logger?.LogWarning(ex, "Connection to PySpeechService closed");
+            Logger?.LogWarning(ex, "Connection to PySpeechService closed");
             _ = CleanupAsync();
         }
     }
@@ -520,7 +524,7 @@ internal class PySpeechService(PySpeechServiceRunner runner, IServiceProvider se
         
         if (!await runner.StartAsync())
         {
-            _logger?.LogError("Could not start PySpeechService process");
+            Logger?.LogError("Could not start PySpeechService process");
             runner.EndProcess();
             return false;
         }
@@ -561,7 +565,7 @@ internal class PySpeechService(PySpeechServiceRunner runner, IServiceProvider se
             await Task.Delay(TimeSpan.FromSeconds(0.3), cancellationToken);
         }
         
-        _logger?.LogError("Failed to receive ping response from PySpeechService");
+        Logger?.LogError("Failed to receive ping response from PySpeechService");
         return false;
     }
     
@@ -585,7 +589,7 @@ internal class PySpeechService(PySpeechServiceRunner runner, IServiceProvider se
         }
         catch (Exception e)
         {
-            _logger?.LogError(e, "Failed to add request to queue");
+            Logger?.LogError(e, "Failed to add request to queue");
             return false;
         }
     }
