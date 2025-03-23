@@ -3,13 +3,13 @@ from pathlib import Path
 from typing import Optional
 
 import yapper.constants as c
-import yapper.utils
 from platformdirs import user_data_dir
 from yapper import PiperSpeaker, PiperVoiceUS, PiperVoiceUK
 from yapper.utils import (
     PLATFORM,
-    install_piper, download_piper_model
 )
+
+from py_speech_service.downloader import download_piper, download_piper_model
 
 
 class Piper(PiperSpeaker):
@@ -19,8 +19,7 @@ class Piper(PiperSpeaker):
 
     def __init__(self, onnx_path: Optional[str] = None, conf_path: Optional[str] = None, piper_voice: str = "", alt_piper_voice: str = ""):
         app_dir = Path(user_data_dir("py_speech_service"))
-        yapper.utils.APP_DIR = app_dir
-        install_piper(False)
+        download_piper(app_dir)
         self.exe_path = str(
             app_dir
             / "piper"
@@ -34,7 +33,7 @@ class Piper(PiperSpeaker):
             voice = self.string_to_voice(piper_voice)
             quality = PiperSpeaker.VOICE_QUALITY_MAP[voice]
             onnx_f, conf_f = download_piper_model(
-                voice, quality, False
+                voice, quality, app_dir
             )
             self.onnx_f, self.conf_f = str(onnx_f), str(conf_f)
             self.voice_onnx_files[voice] = self.onnx_f
@@ -44,7 +43,7 @@ class Piper(PiperSpeaker):
                 voice = self.string_to_voice(alt_piper_voice)
                 quality = PiperSpeaker.VOICE_QUALITY_MAP[voice]
                 onnx_f, conf_f = download_piper_model(
-                    voice, quality, False
+                    voice, quality, app_dir
                 )
                 onnx_f, conf_f = str(onnx_f), str(conf_f)
                 self.voice_onnx_files[voice] = onnx_f
@@ -61,6 +60,7 @@ class Piper(PiperSpeaker):
                 return PiperVoiceUS.HFC_FEMALE
 
     def set_speech_settings(self, onnx_path: Optional[str] = None, conf_path: Optional[str] = None, piper_voice: str = ""):
+        app_dir = Path(user_data_dir("py_speech_service"))
         if onnx_path and conf_path:
             self.onnx_f = onnx_path
             self.conf_f = conf_path
@@ -72,7 +72,7 @@ class Piper(PiperSpeaker):
             else:
                 quality = PiperSpeaker.VOICE_QUALITY_MAP[voice]
                 self.onnx_f, self.conf_f = download_piper_model(
-                    voice, quality, False
+                    voice, quality, app_dir
                 )
                 self.onnx_f, self.conf_f = str(self.onnx_f), str(self.conf_f)
                 self.voice_onnx_files[voice] = self.onnx_f

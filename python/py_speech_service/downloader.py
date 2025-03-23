@@ -1,8 +1,28 @@
+import logging
 import os
+import sys
 import tempfile
+from pathlib import Path
+from urllib.request import urlretrieve
+import yapper.constants as c
 import requests
 import zipfile
 import tarfile
+import platform
+
+from yapper import PiperVoiceUS, PiperQuality, PiperVoiceUK
+
+if os.name == "nt":
+    PLATFORM = c.PLATFORM_WINDOWS
+elif os.name == "posix":
+    home = Path.home()
+    if os.uname().sysname == "Darwin":
+        PLATFORM = c.PLATFORM_MAC
+    else:
+        PLATFORM = c.PLATFORM_LINUX
+else:
+    print("your system is not supported")
+    sys.exit()
 
 def download_file(url: str) -> str:
     # Create a temporary file
@@ -75,3 +95,78 @@ def get_json_data(url):
     except requests.exceptions.RequestException as e:
         print(f"Error fetching data: {e}")
         raise
+
+def download(url: str, file: str):
+    logging.info(f"Downloading {url} to {file}")
+    urlretrieve(url, file)
+    logging.info(f"Download of {url} complete")
+
+def download_piper(piper_dir: Path):
+
+    """Installs piper into the app's home directory."""
+    if (piper_dir / "piper").exists():
+        return
+    zip_path = piper_dir / "piper.zip"
+    prefix = "https://github.com/rhasspy/piper/releases/download/2023.11.14-2"
+    if PLATFORM == c.PLATFORM_LINUX:
+        if platform.machine() in ("aarch64", "arm64"):
+            nix_link = f"{prefix}/piper_linux_aarch64.tar.gz"
+        elif platform.machine() in ("armv7l", "armv7"):
+            nix_link = f"{prefix}/piper_linux_armv7l.tar.gz"
+        else:
+            nix_link = f"{prefix}/piper_linux_x86_64.tar.gz"
+        download(nix_link, str(zip_path))
+    elif PLATFORM == c.PLATFORM_WINDOWS:
+        download(f"{prefix}/piper_windows_amd64.zip", str(zip_path))
+    else:
+        download(f"{prefix}/piper_macos_x64.tar.gz", str(zip_path))
+
+    if PLATFORM == c.PLATFORM_WINDOWS:
+        with zipfile.ZipFile(zip_path, "r") as z_f:
+            z_f.extractall(piper_dir)
+    else:
+        with tarfile.open(zip_path, "r") as z_f:
+            z_f.extractall(piper_dir)
+    os.remove(zip_path)
+
+
+def download_piper_model(
+    voice: PiperVoiceUS | PiperVoiceUK,
+    quality: PiperQuality,
+    piper_dir: Path
+) -> tuple[str, str]:
+    voices_dir = piper_dir / "piper_voices"
+    voices_dir.mkdir(exist_ok=True)
+    lang_code = "en_US" if isinstance(voice, PiperVoiceUS) else "en_GB"
+    voice, quality = voice.value, quality.value
+
+    onnx_file = voices_dir / f"{lang_code}-{voice}-{quality}.onnx"
+    conf_file = voices_dir / f"{lang_code}-{voice}-{quality}.onnx.json"
+
+    prefix = "https://huggingface.co/rhasspy/piper-voices/resolve/main/en/"
+    prefix += lang_code
+    help_url = "https://huggingface.co/rhasspy/piper-voices/tree/main/en/"
+    help_url += lang_code
+    if not onnx_file.exists():
+        try:
+            onnx_url = (
+                f"{prefix}/{voice}/{quality}/{onnx_file.name}?download=true"
+            )
+            download(onnx_url, str(onnx_file))
+        except (KeyboardInterrupt, Exception) as e:
+            onnx_file.unlink(missing_ok=True)
+            if getattr(e, "status", None) == 404:
+                raise Exception(
+                    f"{voice}({quality}) is not available, please refer to"
+                    f" {help_url} to check all available models"
+                )
+            raise e
+    if not conf_file.exists():
+        conf_url = f"{prefix}/{voice}/{quality}/{conf_file.name}?download=true"
+        try:
+            download(conf_url, str(conf_file))
+        except (KeyboardInterrupt, Exception) as e:
+            conf_file.unlink(missing_ok=True)
+            raise e
+
+    return str(onnx_file), str(conf_file)
