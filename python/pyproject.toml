@@ -6,7 +6,7 @@ authors = ["MattEqualsCoder <mattequalscoder@gmail.com>"]
 readme = "README.md"
 
 [tool.poetry.dependencies]
-python = "~3.12"
+python = ">=3.12,<3.14"
 num2words = "^0.5.14"
 rapidfuzz = "^3.11.0"
 speechrecognition = "^3.14.1"

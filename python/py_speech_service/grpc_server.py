@@ -6,7 +6,6 @@ import sys
 import time
 import traceback
 from asyncio import Server, Queue
-from cgi import print_exception
 
 from grpc import aio
 
@@ -145,7 +144,6 @@ class GrpcServer:
                 logging.error("Exception with speech service: " + str(e))
                 logging.error(repr(e))
                 logging.error(traceback.format_exc())
-                print_exception(value = e)
                 response = speech_service_pb2.SpeechServiceResponse()
                 response.error.error_message = "Exception with speech service: " + str(e)
                 response.error.exception = repr(e)

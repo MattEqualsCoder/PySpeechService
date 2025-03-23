@@ -107,6 +107,9 @@ class Speaker:
         asyncio.create_task(self.handle_play_queue())
 
     async def speak_basic_line(self, line: str):
+        folder = os.path.join(tempfile.gettempdir(), "py_speech_service")
+        if not Path(folder).exists():
+            Path(folder).mkdir()
         asyncio.create_task(self.handle_process_queue())
         asyncio.create_task(self.handle_play_queue())
         response_queue = asyncio.Queue()
