@@ -13,6 +13,7 @@ import pyaudio
 from pydub import AudioSegment
 from pydub.silence import detect_leading_silence
 from pydub.utils import make_chunks, ratio_to_db
+from pydub.playback import play
 from yapper.utils import get_random_name
 
 from py_speech_service import speech_service_pb2
@@ -418,6 +419,8 @@ class Speaker:
             if hasattr(request, "speech_settings"):
                 speech_settings = request.speech_settings
             sound = self.__load_audio_file(request.file_path)
+            test = sound.set_frame_rate(44100)
+            play(test)
 
             logging.debug("Loaded audio file " + request.file_path)
 
@@ -429,11 +432,26 @@ class Speaker:
                 frame_rate_modifier = speech_settings.pitch
 
             new_frame_rate = int(sound.frame_rate * frame_rate_modifier)
-            sound = sound._spawn(sound.raw_data, overrides={"frame_rate": new_frame_rate})
+            logging.info(f"previous frame rate {sound.frame_rate} | new frame rate {new_frame_rate}")
+            sound = sound._spawn(sound.raw_data, overrides={"frame_rate": 44100})
+
+            p = pyaudio.PyAudio()
+            for rate in [8000, 16000, 22050, 44100, 48000, 96000]:
+                try:
+                    stream = p.open(format=pyaudio.paInt16, channels=1, rate=rate, output=True)
+                    print(f"Supported: {rate}Hz")
+                    stream.close()
+                except Exception:
+                    print(f"Not Supported: {rate}Hz")
 
             if self.volume != 1:
                 sound = sound.apply_gain(ratio_to_db(self.volume))
 
+            sound = sound.set_frame_rate(44100)
+
+            logging.info(f"previous frame rate {sound.frame_rate} | new frame rate {new_frame_rate}")
+
+            play(sound)
             p = pyaudio.PyAudio()
             stream = p.open(format=p.get_format_from_width(sound.sample_width),
                             channels=sound.channels,

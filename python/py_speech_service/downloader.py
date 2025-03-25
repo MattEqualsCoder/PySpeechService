@@ -1,9 +1,13 @@
 import logging
 import os
+import ssl
 import sys
 import tempfile
+import urllib
 from pathlib import Path
 from urllib.request import urlretrieve
+
+import certifi
 import yapper.constants as c
 import requests
 import zipfile
@@ -98,7 +102,10 @@ def get_json_data(url):
 
 def download(url: str, file: str):
     logging.info(f"Downloading {url} to {file}")
-    urlretrieve(url, file)
+    context = ssl.create_default_context(cafile=certifi.where())
+    # urllib.request.urlretrieve(url, file, context=context)
+    with urllib.request.urlopen(url, context=context) as response, open(file, 'wb') as out_file:
+        out_file.write(response.read())
     logging.info(f"Download of {url} complete")
 
 def download_piper(piper_dir: Path):
