@@ -99,11 +99,13 @@ class Speaker:
     is_done = False
     is_speaking = False
     volume: float = 1
+    supported_sample_rate: int = 0
 
     def start(self):
         folder = os.path.join(tempfile.gettempdir(), "py_speech_service")
         if not Path(folder).exists():
             Path(folder).mkdir()
+        self.determine_sample_rate()
         asyncio.create_task(self.handle_process_queue())
         asyncio.create_task(self.handle_play_queue())
 
@@ -111,6 +113,7 @@ class Speaker:
         folder = os.path.join(tempfile.gettempdir(), "py_speech_service")
         if not Path(folder).exists():
             Path(folder).mkdir()
+        self.determine_sample_rate()
         asyncio.create_task(self.handle_process_queue())
         asyncio.create_task(self.handle_play_queue())
         response_queue = asyncio.Queue()
@@ -135,6 +138,23 @@ class Speaker:
         if self.grpc_response_queue:
             asyncio.create_task(self.grpc_response_queue.put(response))
 
+    def determine_sample_rate(self):
+        if self.supported_sample_rate != 0:
+            return
+
+        p = pyaudio.PyAudio()
+        for rate in [ 22050, 44100, 48000 ]:
+            try:
+                stream = p.open(format=pyaudio.paInt16, channels=1, rate=rate, output=True)
+                print(f"Sample rate of {rate}Hz selected")
+                self.supported_sample_rate = rate
+                stream.close()
+                return
+            except Exception:
+                print(f"Sample rate {rate}Hz not supported")
+
+        self.supported_sample_rate = 22050
+
     async def handle_process_queue(self):
         logging.info("Started handling process queue")
         print("Started handling process queue")
@@ -153,6 +173,7 @@ class Speaker:
     async def handle_play_queue(self):
         logging.info("Started handling play queue")
         print("Started handling play queue")
+
         while not self.shutdown_event.is_set():  # Keep running unless shutdown is triggered
             try:
                 item = await asyncio.wait_for(self.play_queue.get(), timeout=.25)
@@ -435,7 +456,7 @@ class Speaker:
             if self.volume != 1:
                 sound = sound.apply_gain(ratio_to_db(self.volume))
 
-            sound = sound.set_frame_rate(44100)
+            sound = sound.set_frame_rate(self.supported_sample_rate)
 
             p = pyaudio.PyAudio()
             stream = p.open(format=p.get_format_from_width(sound.sample_width),
