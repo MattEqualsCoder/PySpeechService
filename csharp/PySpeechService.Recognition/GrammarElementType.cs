@@ -1,4 +1,4 @@
-﻿namespace PySpeechServiceClient.Grammar;
+﻿namespace PySpeechService.Recognition;
 
 internal enum GrammarElementType
 {

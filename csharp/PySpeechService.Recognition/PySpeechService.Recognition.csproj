@@ -1,0 +1,18 @@
+﻿<Project Sdk="Microsoft.NET.Sdk">
+
+    <PropertyGroup>
+        <TargetFramework>net8.0</TargetFramework>
+        <ImplicitUsings>enable</ImplicitUsings>
+        <Nullable>enable</Nullable>
+        <PackageId>MattEqualsCoder.PySpeechService.Recognition</PackageId>
+        <Authors>MattEqualsCoder.PySpeechService.Recognition</Authors>
+        <Version>0.1.0</Version>
+    </PropertyGroup>
+
+    <ItemGroup>
+      <Reference Include="System.Speech">
+        <HintPath>..\..\..\..\.nuget\packages\system.speech\9.0.1\lib\net8.0\System.Speech.dll</HintPath>
+      </Reference>
+    </ItemGroup>
+
+</Project>

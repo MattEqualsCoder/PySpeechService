@@ -1,5 +1,9 @@
 // ReSharper disable UnusedAutoPropertyAccessor.Global
-namespace PySpeechServiceClient.Models;
+
+using System.Runtime.CompilerServices;
+
+[assembly: InternalsVisibleTo("PySpeechService.Client")]
+namespace PySpeechService.TextToSpeech;
 
 /// <summary>
 /// Class that is returned when the PySpeechService TTS starts or stops

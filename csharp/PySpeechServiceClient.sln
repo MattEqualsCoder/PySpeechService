@@ -1,8 +1,12 @@
 ﻿
 Microsoft Visual Studio Solution File, Format Version 12.00
-Project("{FAE04EC0-301F-11D3-BF4B-00C04F79EFBC}") = "PySpeechServiceClient", "PySpeechServiceClient\PySpeechServiceClient.csproj", "{6BE71D67-FCB4-4868-AF8B-9D5C8BC44A84}"
+Project("{FAE04EC0-301F-11D3-BF4B-00C04F79EFBC}") = "PySpeechService.Client", "PySpeechService.Client\PySpeechService.Client.csproj", "{3F773597-825E-4D4B-8EA2-6008213EDA03}"
 EndProject
-Project("{FAE04EC0-301F-11D3-BF4B-00C04F79EFBC}") = "PySpeechServiceClientExample", "PySpeechServiceClientExample\PySpeechServiceClientExample.csproj", "{C5D5735F-212F-4384-8521-48FA72ABC894}"
+Project("{FAE04EC0-301F-11D3-BF4B-00C04F79EFBC}") = "PySpeechService.Recognition", "PySpeechService.Recognition\PySpeechService.Recognition.csproj", "{1BF28826-438D-46B7-BC0E-EBDD4818B1E2}"
+EndProject
+Project("{FAE04EC0-301F-11D3-BF4B-00C04F79EFBC}") = "PySpeechService.TextToSpeech", "PySpeechService.TextToSpeech\PySpeechService.TextToSpeech.csproj", "{A9310A33-119B-409C-87A9-2C449FA0206E}"
+EndProject
+Project("{FAE04EC0-301F-11D3-BF4B-00C04F79EFBC}") = "PySpeechService.Example", "PySpeechService.Example\PySpeechService.Example.csproj", "{57D46A81-D46A-4152-A973-55319AEE32D9}"
 EndProject
 Global
 	GlobalSection(SolutionConfigurationPlatforms) = preSolution
@@ -10,13 +14,21 @@ Global
 		Release|Any CPU = Release|Any CPU
 	EndGlobalSection
 	GlobalSection(ProjectConfigurationPlatforms) = postSolution
-		{6BE71D67-FCB4-4868-AF8B-9D5C8BC44A84}.Debug|Any CPU.ActiveCfg = Debug|Any CPU
-		{6BE71D67-FCB4-4868-AF8B-9D5C8BC44A84}.Debug|Any CPU.Build.0 = Debug|Any CPU
-		{6BE71D67-FCB4-4868-AF8B-9D5C8BC44A84}.Release|Any CPU.ActiveCfg = Release|Any CPU
-		{6BE71D67-FCB4-4868-AF8B-9D5C8BC44A84}.Release|Any CPU.Build.0 = Release|Any CPU
-		{C5D5735F-212F-4384-8521-48FA72ABC894}.Debug|Any CPU.ActiveCfg = Debug|Any CPU
-		{C5D5735F-212F-4384-8521-48FA72ABC894}.Debug|Any CPU.Build.0 = Debug|Any CPU
-		{C5D5735F-212F-4384-8521-48FA72ABC894}.Release|Any CPU.ActiveCfg = Release|Any CPU
-		{C5D5735F-212F-4384-8521-48FA72ABC894}.Release|Any CPU.Build.0 = Release|Any CPU
+		{3F773597-825E-4D4B-8EA2-6008213EDA03}.Debug|Any CPU.ActiveCfg = Debug|Any CPU
+		{3F773597-825E-4D4B-8EA2-6008213EDA03}.Debug|Any CPU.Build.0 = Debug|Any CPU
+		{3F773597-825E-4D4B-8EA2-6008213EDA03}.Release|Any CPU.ActiveCfg = Release|Any CPU
+		{3F773597-825E-4D4B-8EA2-6008213EDA03}.Release|Any CPU.Build.0 = Release|Any CPU
+		{1BF28826-438D-46B7-BC0E-EBDD4818B1E2}.Debug|Any CPU.ActiveCfg = Debug|Any CPU
+		{1BF28826-438D-46B7-BC0E-EBDD4818B1E2}.Debug|Any CPU.Build.0 = Debug|Any CPU
+		{1BF28826-438D-46B7-BC0E-EBDD4818B1E2}.Release|Any CPU.ActiveCfg = Release|Any CPU
+		{1BF28826-438D-46B7-BC0E-EBDD4818B1E2}.Release|Any CPU.Build.0 = Release|Any CPU
+		{A9310A33-119B-409C-87A9-2C449FA0206E}.Debug|Any CPU.ActiveCfg = Debug|Any CPU
+		{A9310A33-119B-409C-87A9-2C449FA0206E}.Debug|Any CPU.Build.0 = Debug|Any CPU
+		{A9310A33-119B-409C-87A9-2C449FA0206E}.Release|Any CPU.ActiveCfg = Release|Any CPU
+		{A9310A33-119B-409C-87A9-2C449FA0206E}.Release|Any CPU.Build.0 = Release|Any CPU
+		{57D46A81-D46A-4152-A973-55319AEE32D9}.Debug|Any CPU.ActiveCfg = Debug|Any CPU
+		{57D46A81-D46A-4152-A973-55319AEE32D9}.Debug|Any CPU.Build.0 = Debug|Any CPU
+		{57D46A81-D46A-4152-A973-55319AEE32D9}.Release|Any CPU.ActiveCfg = Release|Any CPU
+		{57D46A81-D46A-4152-A973-55319AEE32D9}.Release|Any CPU.Build.0 = Release|Any CPU
 	EndGlobalSection
 EndGlobal

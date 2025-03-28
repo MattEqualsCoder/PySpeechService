@@ -1,23 +1,30 @@
 ﻿using System.Speech.Recognition;
 using Microsoft.Extensions.DependencyInjection;
 using Microsoft.Extensions.Logging;
-using PySpeechServiceClient;
-using PySpeechServiceClient.Grammar;
-using PySpeechServiceClient.Models;
+using PySpeechService.Client;
+using PySpeechService.Recognition;
+using PySpeechService.TextToSpeech;
 using Serilog;
 
 Log.Logger = new LoggerConfiguration()
     .WriteTo.Console()
     .CreateLogger();
 
-var serviceProvider = new ServiceCollection()
+var serviceCollection = new ServiceCollection()
     .AddLogging(loggingBuilder =>
     {
         loggingBuilder.ClearProviders();
         loggingBuilder.AddSerilog();
-    })
-    .AddPySpeechService() // Add PySpeechService for dependency injection
-    .BuildServiceProvider();
+    });
+
+// Add PySpeechService for dependency injection
+// Currently only Linux is supported
+if (OperatingSystem.IsLinux())
+{
+    serviceCollection = serviceCollection.AddPySpeechService();
+}
+    
+var serviceProvider = serviceCollection.BuildServiceProvider();
 
 #region Create Grammar Rules
 List<SpeechRecognitionGrammar> rules = [];
@@ -27,7 +34,7 @@ var builder = new SpeechRecognitionGrammarBuilder("CPU Usage Rule");
 builder.Append("Hey computer,")
     .OneOf("what is my CPU usage?", "how much CPU am I using?");
 var rule = builder.BuildGrammar();
-rule.SpeechRecognized += (sender, eventArgs) =>
+rule.SpeechRecognized += (_, eventArgs) =>
 {
     Console.WriteLine($"CPU Usage Rule identified: {eventArgs.Result.Text} ({eventArgs.Result.Confidence})");
     Console.Write("Enter command: ");
@@ -41,7 +48,7 @@ builder.Append("Hey computer, ")
     .Optional("can you tell me", "could you kindly tell me")
     .OneOf("what is my memory usage?", "what is my RAM usage?");
 rule = builder.BuildGrammar();
-rule.SpeechRecognized += (sender, eventArgs) =>
+rule.SpeechRecognized += (_, eventArgs) =>
 {
     Console.WriteLine($"Memory Usage Rule recognized: {eventArgs.Result.Text} ({eventArgs.Result.Confidence})");
     Console.Write("Enter command: ");
@@ -60,7 +67,7 @@ builder.Append("Hey computer, launch")
         new GrammarKeyValueChoice("RetroArch", "retroarch"),
     ]);
 rule = builder.BuildGrammar();
-rule.SpeechRecognized += (sender, eventArgs) =>
+rule.SpeechRecognized += (_, eventArgs) =>
 {
     var selectedApplication = eventArgs.Result.Semantics["application"].Value;
     Console.WriteLine($"Launch Application Rule recognized with the selected application of: {selectedApplication}");
@@ -87,7 +94,7 @@ builder2.Append("Hey computer,")
     ]);
 builder = SpeechRecognitionGrammarBuilder.Combine(builder1, builder2);
 rule = builder.BuildGrammar("Default Browser Rule");
-rule.SpeechRecognized += (sender, eventArgs) =>
+rule.SpeechRecognized += (_, eventArgs) =>
 {
     var selectedApplication = eventArgs.Result.Semantics["browser"].Value;
     Console.WriteLine($"Default Browser Rule recognized with the selected application of: {selectedApplication}");
@@ -118,6 +125,12 @@ if (OperatingSystem.IsWindows())
 }
 #endregion
 
+if (!OperatingSystem.IsLinux())
+{
+    Console.WriteLine("Currently only Linux is supported");
+    return;
+}
+
 #region Service Initialization
 // You can get the IPySpeechService by either using dependency injection or by using PySpeechServiceBuilder
 IPySpeechService service;
@@ -133,6 +146,7 @@ IPySpeechService service;
 {
     service = serviceProvider.GetRequiredService<IPySpeechService>();
 }
+
 // Add all the speech recognition rules
 foreach (var ruleToAdd in rules)
 {
@@ -150,14 +164,14 @@ service.AddSpeechRecognitionReplacements(new Dictionary<string, string>()
 });
 
 // Event called once the PySpeechService application has been started and connected to successfully
-service.Initialized += (sender, eventArgs) =>
+service.Initialized += (_, _) =>
 {
     Console.WriteLine("PySpeechService initialized and connection confirmed");
 };
 
 // Event called once Piper and all needed files have been downloaded and are ready after SetSpeechSettingsAsync
 // has been called
-service.TextToSpeechInitialized += (sender, eventArgs) =>
+service.TextToSpeechInitialized += (_, _) =>
 {
     Console.WriteLine($"Piper TextToSpeech initialized");
     Console.Write("Enter command: ");
@@ -166,7 +180,7 @@ service.TextToSpeechInitialized += (sender, eventArgs) =>
 // Event called once speech recognition has been initialized successfully after StartSpeechRecognitionAsync has been
 // called. In the returned event args, a list of words that couldn't be recognized by the VOSK speech recognition
 // engine. You will either need to reword things or, for key value pairs, use AddSpeechRecognitionReplacements.
-service.SpeechRecognitionInitialized += (sender, eventArgs) =>
+service.SpeechRecognitionInitialized += (_, eventArgs) =>
 {
     Console.WriteLine("VOSK speech recognition initialized");
     if (eventArgs.InvalidSpeechRecognitionWords?.Count > 0)
@@ -179,7 +193,7 @@ service.SpeechRecognitionInitialized += (sender, eventArgs) =>
 
 // Event called as an update of how text to speech is progressing. Paragraphs and SSML requests are broken into
 // chunks to make processing faster. Each sentence is its own chunk, and each SSML tag will create new chunks.
-service.SpeakCommandResponded += (sender, eventArgs) =>
+service.SpeakCommandResponded += (_, eventArgs) =>
 {
     List<string> parts = [];
     if (eventArgs.Response.IsStartOfMessage)
@@ -211,7 +225,7 @@ service.SpeakCommandResponded += (sender, eventArgs) =>
 };
 
 // Event for whenever any speech is successfully recognized
-service.SpeechRecognized += (sender, eventArgs) =>
+service.SpeechRecognized += (_, eventArgs) =>
 {
     Console.WriteLine($"Sentence recognized: {eventArgs.Result.Text}");
     Console.Write("Enter command: ");

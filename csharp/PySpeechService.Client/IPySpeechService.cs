@@ -1,13 +1,16 @@
-using PySpeechServiceClient.Grammar;
-using PySpeechServiceClient.Models;
+using System.Runtime.Versioning;
+using PySpeechService.Recognition;
+using PySpeechService.TextToSpeech;
+
 // ReSharper disable UnusedMember.Global
 // ReSharper disable EventNeverSubscribedTo.Global
 
-namespace PySpeechServiceClient;
+namespace PySpeechService.Client;
 
 /// <summary>
 /// Service for calling the PySpeechService application
 /// </summary>
+[SupportedOSPlatform("linux")]
 public interface IPySpeechService : IDisposable
 {
     /// <summary>
@@ -88,7 +91,7 @@ public interface IPySpeechService : IDisposable
     /// </summary>
     /// <param name="message">The message to speak</param>
     /// <param name="details">Optional voice settings the override the defaults with</param>
-    public void Speak(string message, Models.SpeechSettings? details = null);
+    public void Speak(string message, TextToSpeech.SpeechSettings? details = null);
     
     /// <summary>
     /// Request the PySpeechService to speak a line
@@ -96,7 +99,7 @@ public interface IPySpeechService : IDisposable
     /// <param name="message">The message to speak</param>
     /// <param name="details">Optional voice settings the override the defaults with</param>
     /// <returns>True if the message was successfully queued.</returns>
-    public Task<bool> SpeakAsync(string message, Models.SpeechSettings? details = null);
+    public Task<bool> SpeakAsync(string message, TextToSpeech.SpeechSettings? details = null);
     
     /// <summary>
     /// Stop the PySpeechService speaking and clear all queued lines
@@ -108,7 +111,7 @@ public interface IPySpeechService : IDisposable
     /// Sets the default voice settings for when TTS is speaking
     /// </summary>
     /// <returns>True if the message was successfully queued.</returns>
-    public Task<bool> SetSpeechSettingsAsync(Models.SpeechSettings settings);
+    public Task<bool> SetSpeechSettingsAsync(TextToSpeech.SpeechSettings settings);
 
     /// <summary>
     /// Starts speech recognition and passes the entered commands to the PySpeechService

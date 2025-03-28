@@ -1,15 +1,16 @@
 ﻿using System.Collections.Concurrent;
-using Grpc.Net.Client;
+using System.Runtime.Versioning;
 using Grpc.Core;
+using Grpc.Net.Client;
 using Microsoft.Extensions.Logging;
 using Newtonsoft.Json;
-using PySpeechServiceClient.Grammar;
-using PySpeechServiceClient.Models;
-using Microsoft.Extensions.DependencyInjection;
+using PySpeechService.Recognition;
+using PySpeechService.TextToSpeech;
 using JsonSerializer = System.Text.Json.JsonSerializer;
 
-namespace PySpeechServiceClient;
+namespace PySpeechService.Client;
 
+[SupportedOSPlatform("linux")]
 internal class PySpeechService(PySpeechServiceRunner runner)
     : IPySpeechService
 {
@@ -107,7 +108,7 @@ internal class PySpeechService(PySpeechServiceRunner runner)
         _replacements = replacements;
     }
 
-    public void Speak(string message, Models.SpeechSettings? details = null)
+    public void Speak(string message, TextToSpeech.SpeechSettings? details = null)
     {
         if (string.IsNullOrEmpty(message))
         {
@@ -145,7 +146,7 @@ internal class PySpeechService(PySpeechServiceRunner runner)
         }
     }
     
-    public Task<bool> SpeakAsync(string message, Models.SpeechSettings? details = null)
+    public Task<bool> SpeakAsync(string message, TextToSpeech.SpeechSettings? details = null)
     {
         if (string.IsNullOrEmpty(message))
         {
@@ -163,7 +164,7 @@ internal class PySpeechService(PySpeechServiceRunner runner)
         }));
     }
 
-    public Task<bool> SetSpeechSettingsAsync(Models.SpeechSettings settings)
+    public Task<bool> SetSpeechSettingsAsync(TextToSpeech.SpeechSettings settings)
     {
         var speechSettings = new SetSpeechSettingsRequest()
         {
@@ -254,7 +255,7 @@ internal class PySpeechService(PySpeechServiceRunner runner)
         GC.SuppressFinalize(this);
     }
 
-    private Task<bool> SendSpeakRequest(string message, Models.SpeechSettings? details = null, ulong? id = null)
+    private Task<bool> SendSpeakRequest(string message, TextToSpeech.SpeechSettings? details = null, ulong? id = null)
     {
         if (!_isSpeechSetup)
         {

@@ -1,0 +1,44 @@
+﻿<Project Sdk="Microsoft.NET.Sdk">
+
+    <PropertyGroup>
+        <TargetFramework>net8.0</TargetFramework>
+        <ImplicitUsings>enable</ImplicitUsings>
+        <Nullable>enable</Nullable>
+        <GeneratePackageOnBuild>true</GeneratePackageOnBuild>
+        <Version>0.1.0</Version>
+        <PackageId>MattEqualsCoder.PySpeechService.Client</PackageId>
+        <Authors>MattEqualsCoder</Authors>
+    </PropertyGroup>
+
+    <PropertyGroup>
+      <GenerateAssemblyInfo>false</GenerateAssemblyInfo>
+      <GenerateTargetFrameworkAttribute>false</GenerateTargetFrameworkAttribute>    
+   </PropertyGroup>
+
+    <ItemGroup>
+      <PackageReference Include="Google.Protobuf" Version="3.30.2" />
+      <PackageReference Include="Grpc.Net.Client" Version="2.70.0" />
+      <PackageReference Include="Grpc.Tools" Version="2.71.0">
+        <PrivateAssets>all</PrivateAssets>
+        <IncludeAssets>runtime; build; native; contentfiles; analyzers; buildtransitive</IncludeAssets>
+      </PackageReference>
+      <PackageReference Include="Microsoft.Extensions.DependencyInjection.Abstractions" Version="9.0.3" />
+      <PackageReference Include="Newtonsoft.Json" Version="13.0.3" />
+    </ItemGroup>
+
+    <ItemGroup>
+      <Protobuf Include="..\..\python\speech_service.proto" Services="SpeechService" Access="Internal" />
+    </ItemGroup>
+
+    <ItemGroup>
+      <ProjectReference Include="..\PySpeechService.Recognition\PySpeechService.Recognition.csproj" />
+      <ProjectReference Include="..\PySpeechService.TextToSpeech\PySpeechService.TextToSpeech.csproj" />
+    </ItemGroup>
+
+    <ItemGroup>
+      <Reference Include="System.Speech">
+        <HintPath>..\..\..\..\.nuget\packages\system.speech\9.0.1\lib\net8.0\System.Speech.dll</HintPath>
+      </Reference>
+    </ItemGroup>
+
+</Project>

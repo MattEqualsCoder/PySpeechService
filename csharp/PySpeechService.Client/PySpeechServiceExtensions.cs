@@ -1,10 +1,12 @@
+using System.Runtime.Versioning;
 using Microsoft.Extensions.DependencyInjection;
 
-namespace PySpeechServiceClient;
+namespace PySpeechService.Client;
 
 /// <summary>
 /// Class for PySpeechService service collection extensions
 /// </summary>
+[SupportedOSPlatform("linux")]
 public static class PySpeechServiceExtensions
 {
     /// <summary>

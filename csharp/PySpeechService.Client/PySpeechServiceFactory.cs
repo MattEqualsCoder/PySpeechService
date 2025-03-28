@@ -1,8 +1,10 @@
+using System.Runtime.Versioning;
 using Microsoft.Extensions.DependencyInjection;
 using Microsoft.Extensions.Logging;
 
-namespace PySpeechServiceClient;
+namespace PySpeechService.Client;
 
+[SupportedOSPlatform("linux")]
 internal class PySpeechServiceFactory(IServiceProvider serviceProvider) : IPySpeechServiceFactory
 {
     private IPySpeechService? _instance;

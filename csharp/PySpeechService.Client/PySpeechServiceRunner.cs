@@ -4,7 +4,7 @@ using System.Text.Json.Serialization;
 using Microsoft.Extensions.Logging;
 using JsonSerializer = System.Text.Json.JsonSerializer;
 
-namespace PySpeechServiceClient;
+namespace PySpeechService.Client;
 
 class PySpeechServiceInitResponse
 {
