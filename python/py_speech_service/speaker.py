@@ -116,6 +116,7 @@ class Speaker:
             print("Piper failed to setup")
             exit(1)
 
+        self.start()
         response_queue = asyncio.Queue()
         self.set_grpc_response_queue(response_queue)
         await self.speak(line)
