@@ -10,9 +10,7 @@
     </PropertyGroup>
 
     <ItemGroup>
-      <Reference Include="System.Speech">
-        <HintPath>..\..\..\..\.nuget\packages\system.speech\9.0.1\lib\net8.0\System.Speech.dll</HintPath>
-      </Reference>
+      <PackageReference Include="System.Speech" Version="9.0.3" />
     </ItemGroup>
 
 </Project>
