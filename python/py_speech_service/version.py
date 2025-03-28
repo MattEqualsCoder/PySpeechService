@@ -2,4 +2,4 @@ class Version:
 
     @staticmethod
     def name():
-        return "0.0.12"
+        return "0.1.0"

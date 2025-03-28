@@ -1,3 +1,4 @@
+import logging
 import subprocess
 from pathlib import Path
 from typing import Optional
@@ -16,10 +17,20 @@ class Piper(PiperSpeaker):
 
     voice_onnx_files: dict[PiperVoiceUS | PiperVoiceUK, str] = {}
     voice_conf_files: dict[PiperVoiceUS | PiperVoiceUK, str] = {}
+    piper_setup: bool = False
+    conf_setup: bool = False
 
     def __init__(self, onnx_path: Optional[str] = None, conf_path: Optional[str] = None, piper_voice: str = "", alt_piper_voice: str = ""):
         app_dir = Path(user_data_dir("py_speech_service"))
-        download_piper(app_dir)
+
+        try:
+            download_piper(app_dir)
+        except Exception as e:
+            print("Download piper error")
+            logging.error("Download piper error")
+            logging.error(e)
+            return
+
         self.exe_path = str(
             app_dir
             / "piper"
@@ -29,6 +40,7 @@ class Piper(PiperSpeaker):
         if onnx_path and conf_path:
             self.onnx_f = onnx_path
             self.conf_f = conf_path
+            self.conf_setup = Path(onnx_path).exists() and Path(conf_path).exists()
         else:
             voice = self.string_to_voice(piper_voice)
             quality = PiperSpeaker.VOICE_QUALITY_MAP[voice]
@@ -48,6 +60,14 @@ class Piper(PiperSpeaker):
                 onnx_f, conf_f = str(onnx_f), str(conf_f)
                 self.voice_onnx_files[voice] = onnx_f
                 self.voice_conf_files[voice] = conf_f
+
+            if self.onnx_f and self.conf_f:
+                self.conf_setup = True
+
+        self.piper_setup = True
+
+    def is_valid(self):
+        return self.piper_setup and self.conf_setup
 
     @staticmethod
     def string_to_voice(voice: str) -> PiperVoiceUS | PiperVoiceUK:
@@ -78,7 +98,11 @@ class Piper(PiperSpeaker):
                 self.voice_onnx_files[voice] = self.onnx_f
                 self.voice_conf_files[voice] = self.conf_f
 
-    def text_to_wav(self, text: str, file: str, rate: float = 1):
+    def text_to_wav(self, text: str, file: str, rate: float = 1) -> bool:
+        if not self.piper_setup:
+            print("Piper not setup")
+            logging.error("Piper not setup")
+            return False
         length_scale = 1 / rate
         subprocess.run(
             [
@@ -97,3 +121,4 @@ class Piper(PiperSpeaker):
             stdout=subprocess.DEVNULL,
             check=True
         )
+        return True

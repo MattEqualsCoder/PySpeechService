@@ -86,8 +86,7 @@ class GrpcServer:
                     print("Received gRPC set_speech_settings request")
 
                     try:
-                        self.speaker.init_speech_settings(SpeechSettings(request.set_speech_settings.speech_settings))
-                        self.speech_initialized = True
+                        self.speech_initialized = self.speaker.init_speech_settings(SpeechSettings(request.set_speech_settings.speech_settings))
                     except Exception as e:
                         response = speech_service_pb2.SpeechServiceResponse()
                         response.speech_settings_set.successful = True

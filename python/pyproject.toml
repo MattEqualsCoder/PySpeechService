@@ -1,6 +1,6 @@
 [tool.poetry]
 name = "py-speech-service"
-version = "0.0.12"
+version = "0.1.0"
 description = ""
 authors = ["MattEqualsCoder <mattequalscoder@gmail.com>"]
 readme = "README.md"

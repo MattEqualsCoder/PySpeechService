@@ -4,6 +4,7 @@ import logging
 import os
 import queue
 import traceback
+from pathlib import Path
 from typing import Optional
 
 import sounddevice as sd
@@ -58,10 +59,12 @@ class SpeechRecognition:
         try:
             self.grammar_parser = GrammarParser()
             self.grammar_parser.set_grammar_file(grammar_file)
+            model_path = ""
 
             if vosk_model is not None:
                 if vosk_model.count("/") > 0 or vosk_model.count("\\") > 0:
                     logging.info("Setting VOSK model path as " + vosk_model)
+                    model_path = vosk_model
                     self.model = Model(vosk_model)
                 else:
                     logging.info("Downloading VOSK model " + vosk_model)
@@ -75,7 +78,7 @@ class SpeechRecognition:
                 self.model = Model(model_path)
 
             self.required_confidence = required_confidence
-            return True
+            return Path(model_path).exists()
         except Exception as e:
             logging.error("Unable to start speech recognition: " + repr(e))
             print("Unable to start speech recognition", str(e))

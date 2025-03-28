@@ -23,7 +23,7 @@ internal class DebugJsonFileData
 
 internal class PySpeechServiceRunner : IDisposable
 {
-    public static readonly string RequiredPySpeechServiceVersion = "0.0.10";
+    public static readonly string RequiredPySpeechServiceVersion = "0.1.0";
     
     internal ILogger<IPySpeechService>? Logger;
     

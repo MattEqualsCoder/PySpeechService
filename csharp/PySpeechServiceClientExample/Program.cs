@@ -179,7 +179,7 @@ service.SpeechRecognitionInitialized += (sender, eventArgs) =>
 
 // Event called as an update of how text to speech is progressing. Paragraphs and SSML requests are broken into
 // chunks to make processing faster. Each sentence is its own chunk, and each SSML tag will create new chunks.
-service.SpeakCommandResponded += async (sender, eventArgs) =>
+service.SpeakCommandResponded += (sender, eventArgs) =>
 {
     List<string> parts = [];
     if (eventArgs.Response.IsStartOfMessage)

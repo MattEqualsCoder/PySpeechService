@@ -101,21 +101,21 @@ class Speaker:
     volume: float = 1
     supported_sample_rate: int = 0
 
-    def start(self):
+    def __init__(self):
         folder = os.path.join(tempfile.gettempdir(), "py_speech_service")
         if not Path(folder).exists():
             Path(folder).mkdir()
         self.determine_sample_rate()
+
+    def start(self):
         asyncio.create_task(self.handle_process_queue())
         asyncio.create_task(self.handle_play_queue())
 
     async def speak_basic_line(self, line: str):
-        folder = os.path.join(tempfile.gettempdir(), "py_speech_service")
-        if not Path(folder).exists():
-            Path(folder).mkdir()
-        self.determine_sample_rate()
-        asyncio.create_task(self.handle_process_queue())
-        asyncio.create_task(self.handle_play_queue())
+        if self.piper is None or not self.piper.is_valid():
+            print("Piper failed to setup")
+            exit(1)
+
         response_queue = asyncio.Queue()
         self.set_grpc_response_queue(response_queue)
         await self.speak(line)
@@ -127,16 +127,18 @@ class Speaker:
             except asyncio.TimeoutError:
                 continue  # Retry checking
 
-    def init_speech_settings(self, settings: SpeechSettings):
+    def init_speech_settings(self, settings: SpeechSettings) -> bool:
         if self.piper is None:
             self.piper = Piper()
         self.piper.set_speech_settings(settings.alt_onnx_path, settings.alt_config_path, settings.alt_model_name)
         self.piper.set_speech_settings(settings.onnx_path, settings.config_path, settings.model_name)
         self.speech_settings = settings
+        is_valid = self.piper.is_valid()
         response = speech_service_pb2.SpeechServiceResponse()
-        response.speech_settings_set.successful = True
+        response.speech_settings_set.successful = is_valid
         if self.grpc_response_queue:
             asyncio.create_task(self.grpc_response_queue.put(response))
+        return is_valid
 
     def determine_sample_rate(self):
         if self.supported_sample_rate != 0:
@@ -146,12 +148,12 @@ class Speaker:
         for rate in [ 22050, 44100, 48000 ]:
             try:
                 stream = p.open(format=pyaudio.paInt16, channels=1, rate=rate, output=True)
-                print(f"Sample rate of {rate}Hz selected")
+                logging.info(f"Sample rate of {rate}Hz selected")
                 self.supported_sample_rate = rate
                 stream.close()
                 return
             except Exception:
-                print(f"Sample rate {rate}Hz not supported")
+                logging.info(f"Sample rate {rate}Hz not supported")
 
         self.supported_sample_rate = 22050
 
@@ -486,10 +488,15 @@ class Speaker:
         if hasattr(request, "message") and request.message:
             try:
                 speech_settings = self.__update_piper(request)
-                await asyncio.to_thread(self.piper.text_to_wav, request.message, request.file_path, speech_settings.speed)
-                logging.info("Wrote to file " + request.file_path)
-                await self.play_queue.put(request)
+                successful = await asyncio.to_thread(self.piper.text_to_wav, request.message, request.file_path, speech_settings.speed)
+                if successful:
+                    logging.info("Wrote to file " + request.file_path)
+                    await self.play_queue.put(request)
+                else:
+                    logging.error(f"Failed to write to file {request.file_path}")
+                    print("Failed to write to file")
             except Exception as e:
+                print("Exception")
                 logging.error(e)
                 logging.error(traceback.format_exc())
         elif hasattr(request, "silence_seconds") and request.silence_seconds:

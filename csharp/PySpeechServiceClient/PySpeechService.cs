@@ -421,7 +421,7 @@ internal class PySpeechService(PySpeechServiceRunner runner)
                     }
                     else
                     {
-                        Logger?.LogError("Text to speech initialization successful");
+                        Logger?.LogError("Text to speech initialization unsuccessful");
                     }
                 }
                 else if (response.Error != null)
