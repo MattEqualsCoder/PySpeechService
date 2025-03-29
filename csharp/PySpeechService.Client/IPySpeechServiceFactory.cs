@@ -2,8 +2,8 @@ using System.Runtime.Versioning;
 
 namespace PySpeechService.Client;
 
-[SupportedOSPlatform("linux")]
 public interface IPySpeechServiceFactory
 {
+    [SupportedOSPlatform("linux")]
     public IPySpeechService GetService();
 }

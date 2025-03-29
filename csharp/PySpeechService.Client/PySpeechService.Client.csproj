@@ -5,7 +5,7 @@
     <ImplicitUsings>enable</ImplicitUsings>
     <Nullable>enable</Nullable>
     <GeneratePackageOnBuild>true</GeneratePackageOnBuild>
-    <Version>0.1.0</Version>
+    <Version>0.1.1</Version>
     <PackageId>MattEqualsCoder.PySpeechService.Client</PackageId>
     <Title>PySpeechService Client</Title>
     <Authors>MattEqualsCoder</Authors>
