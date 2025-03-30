@@ -1,4 +1,5 @@
 import asyncio
+import json
 import logging
 import os
 import sys
@@ -46,6 +47,7 @@ def cli():
             speaker = Speaker()
             speaker.init_speech_settings(SpeechSettings())
             asyncio.run(speaker.speak_basic_line(speech))
+
         elif first_arg == "recognition" or second_arg == "recognition":
             logging.info("Starting speech recognition mode")
 
@@ -57,11 +59,33 @@ def cli():
                 elif arg.startswith("-m"):
                     model = get_single_arg(arg, "-m")
 
+
+            if not grammar:
+                print("Listening for 'test speech recognition'")
+                write_dummy_speech_json()
+                grammar = '/tmp/py_tst_data.json'
+
             logging.info("Grammar file: " + grammar)
             logging.info("model: " + model)
 
             speech_recognition = SpeechRecognition()
             speech_recognition.set_speech_recognition_details(grammar, model)
+            asyncio.run(speech_recognition.start_speech_recognition(None))
+
+        elif first_arg == "test" or second_arg == "test":
+
+            print("Starting Test")
+
+            print("Step 1: Attempting to say \"This is a test message\"")
+            speaker = Speaker()
+            speaker.init_speech_settings(SpeechSettings())
+            asyncio.run(speaker.speak_basic_line("This is a test message"))
+
+            print("Step 2: Waiting for \"test speech recognition\" to be said")
+            write_dummy_speech_json()
+            speech_recognition = SpeechRecognition()
+            speech_recognition.stop_after_first_recognition = True
+            speech_recognition.set_speech_recognition_details('/tmp/py_tst_data.json', "")
             asyncio.run(speech_recognition.start_speech_recognition(None))
 
         elif first_arg == "service" or second_arg == "service":
@@ -74,13 +98,14 @@ def cli():
             print("Usage: py-speech-service (speak/recognition/service)")
             print("  py-speech-service speak \"text to speech\"")
             print("  py-speech-service recognition -g \"path to grammar file\" -m \"path to VOSK model folder\"")
+            print("  py-speech-service test")
             print("  py-speech-service service -g \"path to grammar file\" -m \"path to VOSK model folder\" -p \"preferred port\"")
 
     except Exception as e:
         logging.error(e)
         logging.error(traceback.format_exc())
 
-    time.sleep(5)
+    time.sleep(1)
 
 def get_arg_value(arg: str):
     for current_arg in sys.argv:
@@ -99,6 +124,29 @@ def get_single_arg(arg: str, command: str):
         return arg[len(command)+2:-1]
     else:
         return arg[len(command)+1:]
+
+def write_dummy_speech_json():
+    json_data = {
+        "Rules": [
+            {
+                "Type": 0,
+                "Key": "Test Rule",
+                "Data": [
+                    {
+                        "Type": 1,
+                        "Key": None,
+                        "Data": "Test speech recognition"
+                    }
+                ]
+            }
+        ],
+        "Replacements": {},
+        "Prefix": ""
+    }
+
+    # Write to a JSON file
+    with open('/tmp/py_tst_data.json', 'w', encoding='utf-8') as f:
+        json.dump(json_data, f, ensure_ascii=False, indent=4)
 
 if __name__ == "__main__":
     cli()

@@ -26,6 +26,7 @@ class SpeechRecognition:
     shutdown_event = asyncio.Event()
     recognition_queue = asyncio.Queue()
     vosk_model_folder = os.path.join(user_data_dir("py_speech_service"), "vosk")
+    stop_after_first_recognition: bool = False
 
     def __init__(self):
         SetLogLevel(-1)
@@ -59,9 +60,13 @@ class SpeechRecognition:
         try:
             self.grammar_parser = GrammarParser()
             self.grammar_parser.set_grammar_file(grammar_file)
+            try:
+                os.remove(grammar_file)
+            except:
+                logging.error(f"Unable to delete {grammar_file}")
             model_path = ""
 
-            if vosk_model is not None:
+            if vosk_model is not None and vosk_model != "":
                 if vosk_model.count("/") > 0 or vosk_model.count("\\") > 0:
                     logging.info("Setting VOSK model path as " + vosk_model)
                     model_path = vosk_model
@@ -87,7 +92,7 @@ class SpeechRecognition:
     async def start_speech_recognition(self, context):
         asyncio.create_task(self.process_recognition_queue())
         await asyncio.to_thread(self.listen)
-        await asyncio.sleep(10)
+        await asyncio.sleep(1)
 
     async def process_recognition_queue(self):
         logging.info("Started processing speech recognition queue")
@@ -170,6 +175,8 @@ class SpeechRecognition:
                         await self.grpc_response_queue.put(response)
                     else:
                         print("I heard: '" + text_recognized + "', but I am " + str(round(match.confidence, 2)) + "% sure you said '" + match.matched_text + "'")
+                        if self.stop_after_first_recognition:
+                            self.stop_speech_recognition()
                 else:
                     logging.debug("Recognized text " + text_recognized)
 
