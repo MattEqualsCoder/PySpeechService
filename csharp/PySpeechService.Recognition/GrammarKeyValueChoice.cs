@@ -1,4 +1,4 @@
-﻿namespace PySpeechServiceClient.Grammar;
+﻿namespace PySpeechService.Recognition;
 
 /// <summary>
 /// A class for an option that can be used when building grammar

@@ -1,7 +1,8 @@
+using System.Runtime.CompilerServices;
 using System.Runtime.Versioning;
-using PySpeechServiceClient.Models;
 
-namespace PySpeechServiceClient.Grammar;
+[assembly: InternalsVisibleTo("PySpeechService.Client")]
+namespace PySpeechService.Recognition;
 
 /// <summary>
 /// Built object housing a grammar rule to be used for speech recognition

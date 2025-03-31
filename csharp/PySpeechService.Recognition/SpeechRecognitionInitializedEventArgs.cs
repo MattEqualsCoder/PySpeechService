@@ -1,4 +1,4 @@
-namespace PySpeechServiceClient.Models;
+namespace PySpeechService.Recognition;
 
 public class SpeechRecognitionInitializedEventArgs
 {

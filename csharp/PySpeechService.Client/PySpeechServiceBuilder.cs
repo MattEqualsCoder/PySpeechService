@@ -1,7 +1,9 @@
+using System.Runtime.Versioning;
 using Microsoft.Extensions.Logging;
 
-namespace PySpeechServiceClient;
+namespace PySpeechService.Client;
 
+[SupportedOSPlatform("linux")]
 public class PySpeechServiceBuilder
 {
     private ILogger<IPySpeechService>? _logger;

@@ -1,15 +1,16 @@
 ﻿using System.Collections.Concurrent;
-using Grpc.Net.Client;
+using System.Runtime.Versioning;
 using Grpc.Core;
+using Grpc.Net.Client;
 using Microsoft.Extensions.Logging;
 using Newtonsoft.Json;
-using PySpeechServiceClient.Grammar;
-using PySpeechServiceClient.Models;
-using Microsoft.Extensions.DependencyInjection;
+using PySpeechService.Recognition;
+using PySpeechService.TextToSpeech;
 using JsonSerializer = System.Text.Json.JsonSerializer;
 
-namespace PySpeechServiceClient;
+namespace PySpeechService.Client;
 
+[SupportedOSPlatform("linux")]
 internal class PySpeechService(PySpeechServiceRunner runner)
     : IPySpeechService
 {
@@ -32,6 +33,8 @@ internal class PySpeechService(PySpeechServiceRunner runner)
     private bool _hasPerformedFirstInit;
     private IDictionary<string, string>? _replacements;
     private ulong _currentId;
+    private bool _hasFinishedLine;
+    private bool _ttsNoResponse;
 
     public bool IsConnected { get; private set; }
     
@@ -60,6 +63,8 @@ internal class PySpeechService(PySpeechServiceRunner runner)
         }
         
         _hasSentStoppedEvent = false;
+        _hasFinishedLine = false;
+        _ttsNoResponse = false;
         
         // Attempt to start the service 3 times
         for (var i = 0; i < 3; i++)
@@ -107,9 +112,9 @@ internal class PySpeechService(PySpeechServiceRunner runner)
         _replacements = replacements;
     }
 
-    public void Speak(string message, Models.SpeechSettings? details = null)
+    public void Speak(string message, TextToSpeech.SpeechSettings? details = null)
     {
-        if (string.IsNullOrEmpty(message))
+        if (string.IsNullOrEmpty(message) || _ttsNoResponse)
         {
             return;
         }
@@ -122,6 +127,11 @@ internal class PySpeechService(PySpeechServiceRunner runner)
         _pendingMessageIds.Enqueue(id);
         
         _ = SendSpeakRequest(message, details, id);
+
+        if (!_hasFinishedLine)
+        {
+            _ = CheckForFirstMessage();
+        }
         
         source.Task.GetAwaiter().GetResult();
         
@@ -144,12 +154,17 @@ internal class PySpeechService(PySpeechServiceRunner runner)
             }
         }
     }
-    
-    public Task<bool> SpeakAsync(string message, Models.SpeechSettings? details = null)
+
+    public Task<bool> SpeakAsync(string message, TextToSpeech.SpeechSettings? details = null)
     {
-        if (string.IsNullOrEmpty(message))
+        if (string.IsNullOrEmpty(message) || _ttsNoResponse)
         {
             return Task.FromResult(false);
+        }
+        
+        if (!_hasFinishedLine)
+        {
+            _ = CheckForFirstMessage();
         }
         
         return SendSpeakRequest(message, details);
@@ -163,7 +178,7 @@ internal class PySpeechService(PySpeechServiceRunner runner)
         }));
     }
 
-    public Task<bool> SetSpeechSettingsAsync(Models.SpeechSettings settings)
+    public Task<bool> SetSpeechSettingsAsync(TextToSpeech.SpeechSettings settings)
     {
         var speechSettings = new SetSpeechSettingsRequest()
         {
@@ -254,7 +269,7 @@ internal class PySpeechService(PySpeechServiceRunner runner)
         GC.SuppressFinalize(this);
     }
 
-    private Task<bool> SendSpeakRequest(string message, Models.SpeechSettings? details = null, ulong? id = null)
+    private Task<bool> SendSpeakRequest(string message, TextToSpeech.SpeechSettings? details = null, ulong? id = null)
     {
         if (!_isSpeechSetup)
         {
@@ -326,6 +341,11 @@ internal class PySpeechService(PySpeechServiceRunner runner)
                 
                 if (response.SpeakUpdate != null)
                 {
+                    if (response.SpeakUpdate.IsEndOfChunk && !_hasFinishedLine)
+                    {
+                        _hasFinishedLine = true;
+                    }
+                    
                     if (response.SpeakUpdate.IsEndOfMessage &&
                         _taskCompletionSources.TryGetValue(response.SpeakUpdate.MessageId, out var tcs))
                     {
@@ -591,6 +611,31 @@ internal class PySpeechService(PySpeechServiceRunner runner)
         {
             Logger?.LogError(e, "Failed to add request to queue");
             return false;
+        }
+    }
+    
+    private async Task CheckForFirstMessage()
+    {
+        await Task.Delay(TimeSpan.FromSeconds(30));
+        if (_hasFinishedLine)
+        {
+            return;
+        }
+
+        _ttsNoResponse = true;
+        Logger?.LogError("No end of chunk message received. TTS does not appear to be working. Check the py-speech-service logs.");
+        
+        var sources = _taskCompletionSources.Values.ToList();
+        foreach (var source in sources)
+        {
+            try
+            {
+                source.TrySetResult();
+            }
+            catch (Exception e)
+            {
+                Logger?.LogError(e, "Unable to stop task from Speak command");
+            }
         }
     }
 }

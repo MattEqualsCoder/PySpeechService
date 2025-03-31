@@ -1,4 +1,4 @@
-﻿namespace PySpeechServiceClient.Grammar;
+﻿namespace PySpeechService.Recognition;
 
 /// <summary>
 /// Builder for generating speech recognition grammar that can be used for either Windows speech

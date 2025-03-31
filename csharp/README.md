@@ -2,9 +2,15 @@
 
 The PySpeechServiceClient nuget package can be used to start and initialize PySpeechService, create speech recognition grammar, send messages to the PySpeechService, and receive messages from the PySpeechService application.
 
+Currently the PySpeechService application is only built for Linux, but the recognition grammar builder can be used for both PySpeechService speech recognition as well as Microsoft System.Speech speech recognition.
+
 ## Adding PySpeechServiceClient
 
-To utilize PySpeechService in your C# application, first add the PySpeechServiceClient nuget package to your application. 
+To utilize PySpeechService in your C# application, first add the PySpeechServiceClient nuget package(s) to your application.
+
+* MattEqualsCoder.PySpeechService.Recognition - Classes for building grammar and receiving speech recognition events.
+* MattEqualsCoder.PySpeechService.TextToSpeech - Classes for text to speech requests and events.
+* MattEqualsCoder.PySpeechService.Client - Classes for services for connecting to the PySpeechService application. Includes the above two packages. Note that while the above two can be used on any operating system, this can currently only be used on Linux as it's the only operating system currently fully supported by PySpeechService.
 
 If you're using dependency injection, you can simply call the IServiceCollection extension function AddPySpeechService to add the relevant classes. You can get IPySpeechService via dependency injection wherever you need to use PySpeechService.
 

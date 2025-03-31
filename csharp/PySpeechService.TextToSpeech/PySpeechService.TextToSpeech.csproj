@@ -1,0 +1,23 @@
+﻿<Project Sdk="Microsoft.NET.Sdk">
+
+  <PropertyGroup>
+    <TargetFrameworks>net8.0;net9.0</TargetFrameworks>
+    <ImplicitUsings>enable</ImplicitUsings>
+    <Nullable>enable</Nullable>
+    <GeneratePackageOnBuild>true</GeneratePackageOnBuild>
+    <PackageId>MattEqualsCoder.PySpeechService.TextToSpeech</PackageId>
+    <Version>0.1.0</Version>
+    <Title>PySpeechService Text to Speech Models</Title>
+    <Authors>MattEqualsCoder</Authors>
+    <Description>Nuget package for models for utilizing the PySpeechService application for Piper text to speech</Description>
+    <PackageReadmeFile>README.md</PackageReadmeFile>
+    <PackageLicenseExpression>MIT</PackageLicenseExpression>
+    <PackageProjectUrl>https://github.com/MattEqualsCoder/PySpeechService</PackageProjectUrl>
+    <RepositoryUrl>https://github.com/MattEqualsCoder/PySpeechService</RepositoryUrl>
+  </PropertyGroup>
+
+  <ItemGroup>
+    <None Include="../README.md" Pack="true" PackagePath="README.md" />
+  </ItemGroup>
+
+</Project>

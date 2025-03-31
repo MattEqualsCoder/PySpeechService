@@ -1,5 +1,5 @@
 // ReSharper disable UnusedMember.Global
-namespace PySpeechServiceClient.Models;
+namespace PySpeechService.Recognition;
 
 /// <summary>
 /// A key value pair that was matched from what the user stated

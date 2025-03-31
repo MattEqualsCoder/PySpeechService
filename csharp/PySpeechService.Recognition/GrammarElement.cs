@@ -1,7 +1,7 @@
 ﻿using System.Runtime.Versioning;
 using System.Speech.Recognition;
 
-namespace PySpeechServiceClient.Grammar;
+namespace PySpeechService.Recognition;
 
 internal class GrammarElement(GrammarElementType type, object? data = null, string? key = null)
 {

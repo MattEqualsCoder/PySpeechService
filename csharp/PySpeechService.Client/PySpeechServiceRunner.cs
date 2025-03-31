@@ -4,7 +4,7 @@ using System.Text.Json.Serialization;
 using Microsoft.Extensions.Logging;
 using JsonSerializer = System.Text.Json.JsonSerializer;
 
-namespace PySpeechServiceClient;
+namespace PySpeechService.Client;
 
 class PySpeechServiceInitResponse
 {
@@ -259,7 +259,6 @@ internal class PySpeechServiceRunner : IDisposable
         {
             Logger?.LogError("Received error from PySpeechService: {Error}", e.Data);
         }
-        
     }
 
     private void ProcessOnOutputDataReceived(object sender, DataReceivedEventArgs e)
