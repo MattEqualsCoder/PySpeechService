@@ -259,7 +259,6 @@ internal class PySpeechServiceRunner : IDisposable
         {
             Logger?.LogError("Received error from PySpeechService: {Error}", e.Data);
         }
-        
     }
 
     private void ProcessOnOutputDataReceived(object sender, DataReceivedEventArgs e)

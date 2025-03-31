@@ -401,13 +401,13 @@ bool IsSpeakRequest(string message, out string toSpeakMessage, out bool isAsync)
     if (command.StartsWith("say wait "))
     {
         isAsync = false;
-        toSpeakMessage = message[9..];
+        toSpeakMessage = message[8..];
         return true;
     }
     else if (command.StartsWith("speak wait "))
     {
         isAsync = false;
-        toSpeakMessage = message[12..];
+        toSpeakMessage = message[11..];
         return true;
     }
     
