@@ -99,21 +99,23 @@ public interface IPySpeechService : IDisposable
     public void AddSpeechRecognitionReplacements(IDictionary<string, string> replacements);
 
     /// <summary>
-    /// Request the PySpeechService to speak a line
+    /// Request the PySpeechService to speak a line and wait for its response
     /// </summary>
     /// <param name="message">The message to speak</param>
     /// <param name="details">Optional voice settings the override the defaults with</param>
+    /// <param name="messageId">Optional message id to correlate a response with</param>
     [SupportedOSPlatform("linux")]
-    public void Speak(string message, TextToSpeech.SpeechSettings? details = null);
-    
+    public void Speak(string message, TextToSpeech.SpeechSettings? details = null, string? messageId = null);
+
     /// <summary>
     /// Request the PySpeechService to speak a line
     /// </summary>
     /// <param name="message">The message to speak</param>
     /// <param name="details">Optional voice settings the override the defaults with</param>
+    /// <param name="messageId">Optional message id to correlate a response with</param>
     /// <returns>True if the message was successfully queued.</returns>
     [SupportedOSPlatform("linux")]
-    public Task<bool> SpeakAsync(string message, TextToSpeech.SpeechSettings? details = null);
+    public Task<bool> SpeakAsync(string message, TextToSpeech.SpeechSettings? details = null, string? messageId = null);
     
     /// <summary>
     /// Stop the PySpeechService speaking and clear all queued lines

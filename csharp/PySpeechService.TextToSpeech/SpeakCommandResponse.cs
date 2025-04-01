@@ -45,6 +45,11 @@ public class SpeakCommandResponse
     /// If there is another queued message after this one
     /// </summary>
     public bool HasAnotherRequest { get; internal init; }
+    
+    /// <summary>
+    /// The message id to identify the message
+    /// </summary>
+    public string? MessageId { get; internal init; }
 }
 
 /// <summary>
