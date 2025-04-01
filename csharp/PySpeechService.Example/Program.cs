@@ -196,6 +196,9 @@ service.SpeechRecognitionInitialized += (_, eventArgs) =>
 service.SpeakCommandResponded += (_, eventArgs) =>
 {
     List<string> parts = [];
+    
+    parts.Add($"Id: {eventArgs.Response.MessageId}");
+    
     if (eventArgs.Response.IsStartOfMessage)
     {
         parts.Add("Message start");
@@ -260,14 +263,16 @@ while (service.IsConnected)
     // Starts text to speech for a message in either asynchronously or synchronously
     else if (IsSpeakRequest(message, out var toSpeak, out var isAsync))
     {
+        var messageId = Guid.NewGuid().ToString();
+        Console.WriteLine($"Sent message request id {messageId}");
         if (!isAsync)
         {
-            service.Speak(toSpeak);
+            service.Speak(toSpeak, messageId: messageId);
             Console.WriteLine("Wait speak message complete");
         }
         else
         {
-            await service.SpeakAsync(toSpeak);
+            await service.SpeakAsync(toSpeak, messageId: messageId);
         }
     }
     

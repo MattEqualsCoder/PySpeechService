@@ -20,6 +20,7 @@ internal class PySpeechService(PySpeechServiceRunner runner)
     private readonly ConcurrentDictionary<ulong, TaskCompletionSource> _taskCompletionSources = [];
     private readonly ConcurrentQueue<SpeechServiceRequest> _requests = new();
     private readonly ConcurrentQueue<ulong> _pendingMessageIds = [];
+    private readonly ConcurrentDictionary<ulong, string> _messageIds = [];
     private GrpcChannel? _channel;
     private CancellationTokenSource? _cts;
     private AsyncDuplexStreamingCall<SpeechServiceRequest, SpeechServiceResponse>? _speechGrpcService;
@@ -112,7 +113,7 @@ internal class PySpeechService(PySpeechServiceRunner runner)
         _replacements = replacements;
     }
 
-    public void Speak(string message, TextToSpeech.SpeechSettings? details = null)
+    public void Speak(string message, TextToSpeech.SpeechSettings? details = null, string? messageId = null)
     {
         if (string.IsNullOrEmpty(message) || _ttsNoResponse)
         {
@@ -126,7 +127,7 @@ internal class PySpeechService(PySpeechServiceRunner runner)
         _taskCompletionSources.TryAdd(id, source);
         _pendingMessageIds.Enqueue(id);
         
-        _ = SendSpeakRequest(message, details, id);
+        _ = SendSpeakRequest(message, details, id, messageId);
 
         if (!_hasFinishedLine)
         {
@@ -155,7 +156,7 @@ internal class PySpeechService(PySpeechServiceRunner runner)
         }
     }
 
-    public Task<bool> SpeakAsync(string message, TextToSpeech.SpeechSettings? details = null)
+    public Task<bool> SpeakAsync(string message, TextToSpeech.SpeechSettings? details = null, string? messageId = null)
     {
         if (string.IsNullOrEmpty(message) || _ttsNoResponse)
         {
@@ -167,7 +168,7 @@ internal class PySpeechService(PySpeechServiceRunner runner)
             _ = CheckForFirstMessage();
         }
         
-        return SendSpeakRequest(message, details);
+        return SendSpeakRequest(message, details, null, messageId);
     }
 
     public Task<bool> StopSpeakingAsync()
@@ -269,7 +270,7 @@ internal class PySpeechService(PySpeechServiceRunner runner)
         GC.SuppressFinalize(this);
     }
 
-    private Task<bool> SendSpeakRequest(string message, TextToSpeech.SpeechSettings? details = null, ulong? id = null)
+    private Task<bool> SendSpeakRequest(string message, TextToSpeech.SpeechSettings? details = null, ulong? id = null, string? messageId = null)
     {
         if (!_isSpeechSetup)
         {
@@ -279,6 +280,11 @@ internal class PySpeechService(PySpeechServiceRunner runner)
 
         id ??= _currentId + 1;
         _currentId = id.Value;
+
+        if (messageId != null)
+        {
+            _messageIds.TryAdd(id.Value, messageId);
+        }
         
         return Task.FromResult(SendSpeechServiceRequest(new SpeechServiceRequest()
         {
@@ -368,6 +374,8 @@ internal class PySpeechService(PySpeechServiceRunner runner)
                             }
                         }
                     }
+
+                    _messageIds.TryGetValue(response.SpeakUpdate.MessageId, out var messageId);
                     
                     SpeakCommandResponded?.Invoke(this, new SpeakCommandResponseEventArgs(new SpeakCommandResponse()
                     {
@@ -377,7 +385,8 @@ internal class PySpeechService(PySpeechServiceRunner runner)
                         IsStartOfChunk = response.SpeakUpdate.IsStartOfChunk,
                         IsEndOfMessage = response.SpeakUpdate.IsEndOfMessage,
                         IsEndOfChunk = response.SpeakUpdate.IsEndOfChunk,
-                        HasAnotherRequest = response.SpeakUpdate.HasAnotherRequest
+                        HasAnotherRequest = response.SpeakUpdate.HasAnotherRequest,
+                        MessageId = messageId,
                     }));
                 }
                 else if (response.SpeechRecognized != null)
