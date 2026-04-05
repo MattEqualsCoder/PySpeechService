@@ -72,7 +72,11 @@ public class SpeechRecognitionGrammarBuilder
     /// <returns>The updated builder object</returns>
     public SpeechRecognitionGrammarBuilder Append(string key, List<GrammarKeyValueChoice> grammarChoices)
     {
-        
+        var invalidOption = grammarChoices.FirstOrDefault(x => string.IsNullOrEmpty(x.Key));
+        if (invalidOption != null)
+        {
+            throw new InvalidOperationException($"{key} has has invalid grammar choice for value {invalidOption.Value}");
+        }
         _grammarElements.Add(new GrammarElement(GrammarElementType.KeyValue, grammarChoices, key));
         return this;
     }

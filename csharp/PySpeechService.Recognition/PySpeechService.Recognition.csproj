@@ -5,7 +5,7 @@
     <ImplicitUsings>enable</ImplicitUsings>
     <Nullable>enable</Nullable>
     <PackageId>MattEqualsCoder.PySpeechService.Recognition</PackageId>
-    <Version>0.1.0</Version>
+    <Version>0.1.1</Version>
     <Title>PySpeechService Recognition Models</Title>
     <Authors>MattEqualsCoder</Authors>
     <Description>Nuget package for models for utilizing the PySpeechService application for VOSK speech recognition</Description>
